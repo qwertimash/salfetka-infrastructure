@@ -32,6 +32,8 @@ def files():
         'mobile/core/routing/assets/geodata-tags-v1.json', 'mobile/core/routing/assets/registry-v1.json',
         'panel/tests/compatibility/fixtures.json', 'panel/tests/compatibility/manifest_test.go',
         'services/traffic_observation.py', 'services/traffic_observation_sources.py',
+        'services/antifraud.py', 'services/antifraud_api.py', 'services/antifraud_budget.py',
+        'tests/__init__.py', 'tests/antifraud_tls_fixture.py', 'tests/test_traffic_observation.py',
         'panel/tests/acceptance_installer_linux.py'])
     golden = json.loads((ROOT / 'panel/tests/compatibility/fixtures.json').read_text())
     for relative in golden['source_hashes']:

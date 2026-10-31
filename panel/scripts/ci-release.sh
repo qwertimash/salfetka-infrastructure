@@ -4,6 +4,10 @@ set -eu
 version=${1:?version required}
 arch=${2:?amd64 or arm64 required}
 export SALFETKA_VERSION="$version" PANEL_GO=go GOPROXY=https://proxy.golang.org GOSUMDB=sum.golang.org
+python3 -m venv "$RUNNER_TEMP/salfetka-test-python"
+"$RUNNER_TEMP/salfetka-test-python/bin/pip" install --disable-pip-version-check aiohttp==3.10.10
+export B0_PYTHON="$RUNNER_TEMP/salfetka-test-python/bin/python"
+"$B0_PYTHON" -c 'import tests.antifraud_tls_fixture'
 python3 - <<'PY'
 import importlib.util,json
 from pathlib import Path
