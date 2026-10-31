@@ -301,6 +301,9 @@ func TestHeartbeatReplayFreshnessBootRetirementAndRevocation(t *testing.T) {
 		t.Fatal(err)
 	}
 	again, replay, err := f.s.Heartbeat(ctx, cert, r)
+	// JSON replay preserves the instant, not the process-local time.Location pointer.
+	first.ReceivedAt = first.ReceivedAt.UTC()
+	again.ReceivedAt = again.ReceivedAt.UTC()
 	if err != nil || !replay || again != first {
 		t.Fatal("heartbeat replay", err)
 	}

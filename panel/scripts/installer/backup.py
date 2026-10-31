@@ -95,20 +95,28 @@ def restore(root, directory, expected_state):
     with (directory / 'database.dump').open('rb') as source:
         import subprocess
         argv = ['docker', 'compose', '--project-name', panel.PROJECT, '--env-file', 'compose.env', '-f', 'compose.json',
-                'exec', '-T', 'postgres', 'pg_restore', '--exit-on-error', '--no-owner', '-U', 'panel_migrator', '-d', target_db]
+                'exec', '-T', 'postgres', 'pg_restore', '--exit-on-error', '--no-owner', '--no-acl', '-U', 'panel_migrator', '-d', target_db]
         result = subprocess.run(argv, cwd=home, stdin=source, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=600)
         require(result.returncode == 0, 'restore_failed_live_database_unchanged')
-    # Sessions and unused invitations are never resurrected. Runtime leases expire
-    # and the panel remains stopped until the operator explicitly starts it.
+    # Provision a distinct least-privilege runtime role for this inactive DB.
+    # The existing runtime role intentionally cannot gain access to a second DB.
+    candidate = home / 'secrets/restore-database-url'
+    migrator = urlsplit(regular(home / 'secrets/database-migrator-url', private=True).decode().strip())
+    candidate_dsn = urlunsplit((migrator.scheme, migrator.netloc, '/' + target_db, migrator.query, ''))
+    atomic(candidate, (candidate_dsn + '\n').encode())
+    runtime_role = 'panel_runtime_restore_' + target_db.removeprefix('panel_restore_')
+    for arguments in [('migrate',), ('provision-runtime', '--password-file', '/run/panel/runtime-password', '--runtime-role', runtime_role)]:
+        panel.compose(home, 'run', '--rm', '-e', 'PANEL_DATABASE_URL_FILE=/run/panel/restore-database-url', 'setup', *arguments)
+    # Sessions and unused invitations are never resurrected. The explicit
+    # restore consent covers the snapshot's access state; services stay stopped.
     panel.compose(home, 'exec', '-T', 'postgres', 'psql', '-v', 'ON_ERROR_STOP=1', '-U', 'panel_migrator', '-d', target_db,
                   '-c', "BEGIN; DELETE FROM admin_sessions; UPDATE nodes_enrollments SET revoked=true WHERE used_at IS NULL; DELETE FROM bypass_leases; COMMIT;")
     panel.compose(home, 'stop', 'edge', 'admin', 'delivery', 'worker')
-    for name in ('database-migrator-url', 'database-runtime-url'):
-        path = home / 'secrets' / name
-        u = urlsplit(regular(path, private=True).decode().strip())
-        atomic(path, (urlunsplit((u.scheme, u.netloc, '/' + target_db, u.query, '')) + '\n').encode())
-    # Migrate the restored snapshot using the currently installed version. Old
-    # database remains intact; a failure leaves services stopped with the journal.
-    panel.compose(home, 'run', '--rm', 'setup', 'migrate')
-    panel.compose(home, 'run', '--rm', 'setup', 'provision-runtime', '--password-file', '/run/panel/runtime-password')
+    atomic(home / 'secrets/database-migrator-url', (candidate_dsn + '\n').encode())
+    path = home / 'secrets/database-runtime-url'
+    u = urlsplit(regular(path, private=True).decode().strip())
+    # Replace only the validated role; preserve the strong private password.
+    netloc = runtime_role + ':' + u.password + '@' + u.hostname + ':' + str(u.port)
+    atomic(path, (urlunsplit((u.scheme, netloc, '/' + target_db, u.query, '')) + '\n').encode())
+    candidate.unlink()
     return target_db

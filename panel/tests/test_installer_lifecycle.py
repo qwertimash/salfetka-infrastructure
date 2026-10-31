@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import patch, Mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-from installer import backup, manager, panel, system
+from installer import backup, manager, node, panel, system
 from installer.common import Failure, atomic, decode, regular, save, sha256
 
 
@@ -123,3 +123,24 @@ class LifecycleTests(unittest.TestCase):
         with patch.object(backup,'verify',return_value=state), patch.object(panel,'owned',return_value={}), patch.object(panel,'compose') as compose:
             with self.assertRaisesRegex(Failure,'identity_mismatch'):backup.restore(self.root,archive,state)
         compose.assert_not_called()
+
+    def test_retry_uses_original_backup_and_target_after_failed_update(self):
+        m=self.manager();m.commit({'phase':'updating','components':{'panel':{'version':'0.6.0'}},'config':{}})
+        m.journal('update','panel',target='0.6.1',selected='panel',backup=str(self.root/'original-backup'))
+        manifest={'version':'0.6.1','database_min':1,'database_max':24,'database_target':24}
+        m.fetch=Mock(return_value=(manifest,self.root/'release'))
+        with patch.object(panel,'database_version',return_value=24), patch.object(panel,'load_image'), \
+             patch.object(backup,'verify') as verify, patch.object(backup,'create') as create, patch.object(panel,'update'):
+            m.update('9.0.0')
+        self.assertEqual(m.fetch.call_args.args[0],'0.6.1')
+        create.assert_not_called();verify.assert_called_once_with(self.root/'original-backup')
+        self.assertEqual(m.state()['phase'],'ready')
+        self.assertEqual(m.state()['components']['panel']['version'],'0.6.1')
+
+    def test_wrong_node_architecture_is_refused_before_service_stop(self):
+        package=self.root/'package';(package/'bin').mkdir(parents=True);(package/'systemd').mkdir()
+        (package/'systemd/salfetka-server-node.service').write_text('[Service]\nUser=salfetka-server-node\n')
+        for name in ('panel-node','panel-server-node'):(package/'bin'/name).write_bytes(b'not-an-ELF-binary-000000')
+        with patch.object(node,'HOME',self.root/'node'), patch.object(node,'owned'), patch.object(node,'run') as run:
+            with self.assertRaisesRegex(Failure,'architecture'):node.update(package,'0.6.1')
+        run.assert_not_called()

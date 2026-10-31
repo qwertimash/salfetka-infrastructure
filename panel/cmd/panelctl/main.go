@@ -86,6 +86,7 @@ func run(args []string) error {
 	flags.SetOutput(os.Stderr)
 	file := flags.String("token-file", "", "private bootstrap JSON file (token is never printed)")
 	passwordFile := flags.String("password-file", "", "private runtime role password file")
+	runtimeRole := flags.String("runtime-role", "panel_runtime", "dedicated runtime role for this database")
 	if e := flags.Parse(args[1:]); e != nil || flags.NArg() != 0 {
 		return errors.New("invalid_arguments")
 	}
@@ -114,7 +115,7 @@ func run(args []string) error {
 		return errors.New("database_not_ready_run_migrations")
 	}
 	if command == "provision-runtime" {
-		if e = provisionRuntime(ctx, pool, *passwordFile); e != nil {
+		if e = provisionRuntime(ctx, pool, *passwordFile, *runtimeRole); e != nil {
 			return e
 		}
 		fmt.Println("runtime_role_provisioned")

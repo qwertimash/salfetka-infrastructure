@@ -209,7 +209,11 @@ print('panel_export_observer_pass')
 	}
 	cliContext, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
-	cli := exec.CommandContext(cliContext, filepath.Join(repo, "mobile", "scripts", "go.sh"),
+	goTool := os.Getenv("PANEL_GO")
+	if goTool == "" {
+		goTool = filepath.Join(repo, "mobile", "scripts", "go.sh")
+	}
+	cli := exec.CommandContext(cliContext, goTool,
 		"run", "-mod=readonly", "./cmd/panelctl", "export-traffic", "--nodes-file", idsFile, "--output-dir", cliDir)
 	cli.Dir = filepath.Join(repo, "panel")
 	cli.Env = append(os.Environ(), "PANEL_DATABASE_URL_FILE="+dsnFile,

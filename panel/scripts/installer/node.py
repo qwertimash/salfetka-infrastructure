@@ -59,17 +59,36 @@ def health():
     raise Failure('node_authenticated_heartbeat_timeout')
 
 
+def release_unit(package):
+    raw = regular(Path(package) / 'systemd/salfetka-server-node.service', 65536).decode()
+    raw = raw.replace('/usr/local/libexec/salfetka-server-node', str(HOME / 'bin'))
+    raw = raw.replace('/etc/salfetka-server-node', str(HOME / 'config')).replace('/var/lib/salfetka-server-node', str(HOME / 'state'))
+    raw = raw.replace('User=salfetka-server-node', 'User=salfetka-main').replace('Group=salfetka-server-node', 'Group=salfetka-main')
+    return raw.replace('StateDirectory=salfetka-server-node\nStateDirectoryMode=0700', 'ReadWritePaths=' + str(HOME / 'state')).encode()
+
+
 def update(package, version):
-    owned(package)
-    import platform
+    import hashlib, platform
+    unit = Path('/etc/systemd/system') / SERVICE
+    desired = release_unit(package)
+    pending = HOME / 'update.json'
+    if pending.exists():
+        transaction = decode(regular(pending, private=True))
+        require(transaction['version'] == version and transaction['new_unit'] == hashlib.sha256(desired).hexdigest(), 'node_update_target_changed')
+        for path in (unit, HOME / SERVICE):
+            require(sha256(path) in (transaction['old_unit'], transaction['new_unit']), 'foreign_node_unit_preserved')
+        owner = decode(regular(HOME / 'owner.json', private=True))
+        require(owner.get('home') == str(HOME) and owner.get('service') == 'salfetka-main' and owner.get('backend') == 'managed', 'node_ownership_mismatch')
+    else:
+        owned(package)
     machine = {'x86_64': 62, 'aarch64': 183, 'arm64': 183}.get(platform.machine())
     for name in ('panel-node', 'panel-server-node'):
         raw = regular(Path(package) / 'bin' / name, 256 * 1024 * 1024)
         require(len(raw) >= 20 and raw[:6] == b'\x7fELF\x02\x01'
                 and int.from_bytes(raw[18:20], 'little') == machine, 'node_architecture_mismatch')
     with lock('/run/salfetka-install.lock'):
-        # All inputs verified against the signed outer archive before this call.
-        # Keep service identity, CA, signer, private keys and replay watermarks.
+        if not pending.exists():
+            save(pending, {'version': version, 'old_unit': sha256(unit), 'new_unit': hashlib.sha256(desired).hexdigest()})
         run(['systemctl', 'stop', SERVICE])
         import pwd
         gid = pwd.getpwnam('salfetka-main').pw_gid
@@ -77,10 +96,14 @@ def update(package, version):
             target = HOME / 'bin' / name
             atomic(target, regular(Path(package) / 'bin' / name, 256 * 1024 * 1024), 0o755)
             os.chown(target, 0, gid)
+        atomic(HOME / SERVICE, desired, 0o600)
+        atomic(unit, desired, 0o644)
+        run(['systemctl', 'daemon-reload'])
         run(['systemctl', 'start', SERVICE])
         health()
         save(HOME / 'release.json', {'version': version, 'binary_sha256': sha256(HOME / 'bin/panel-server-node'),
                                    'enroller_sha256': sha256(HOME / 'bin/panel-node')})
+        pending.unlink()
 
 
 def resume(package, version):

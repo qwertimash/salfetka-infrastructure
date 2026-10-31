@@ -29,7 +29,13 @@ def archive(source, target):
                 if path.is_dir() or '__pycache__' in path.parts or path.suffix == '.pyc': continue
                 require(path.is_file(), 'package_special_file_refused')
                 info = tarfile.TarInfo(path.relative_to(source).as_posix())
-                info.size = path.stat().st_size; info.mode = 0o755 if path.stat().st_mode & 0o111 else 0o644
+                info.size = path.stat().st_size
+                # GitHub artifact transport normalizes modes to 0644. Restore
+                # the executable mode of the known prebuilt ELF tools explicitly.
+                binary = path.parent.name == 'bin' and path.name in ('panel-api', 'panel-worker', 'panelctl', 'panel-node', 'panel-vpn-node', 'panel-server-node')
+                if binary:
+                    with path.open('rb') as check: require(check.read(4) == b'\x7fELF', 'package_binary_not_elf')
+                info.mode = 0o755 if binary or path.stat().st_mode & 0o111 else 0o644
                 info.uid = info.gid = info.mtime = 0
                 with path.open('rb') as content: out.addfile(info, content)
 

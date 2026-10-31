@@ -16,12 +16,26 @@ var errUnsafeRuntimeRole = errors.New("runtime_role_has_unsafe_privileges")
 
 // The runtime role can operate on current tables but cannot migrate, change
 // schema checksums, or edit/delete audit. Only explicit owner CLI calls this.
-func provisionRuntime(ctx context.Context, pool *pgxpool.Pool, passwordFile string) error {
+func validRuntimeRole(role string) bool {
+	return regexp.MustCompile(`^panel_runtime(?:_restore_[a-f0-9]{12})?$`).MatchString(role)
+}
+
+func provisionRuntime(ctx context.Context, pool *pgxpool.Pool, passwordFile string, names ...string) error {
+	role := "panel_runtime"
+	if len(names) > 1 {
+		return errors.New("runtime_role_name_invalid")
+	}
+	if len(names) == 1 {
+		role = names[0]
+	}
+	if !validRuntimeRole(role) {
+		return errors.New("runtime_role_name_invalid")
+	}
 	b, e := appconfig.PrivateFile(passwordFile)
 	if e != nil {
 		return e
 	}
-	return provisionRuntimeTarget(ctx, pool, strings.TrimSpace(string(b)), "panel_runtime", "public")
+	return provisionRuntimeTarget(ctx, pool, strings.TrimSpace(string(b)), role, "public")
 }
 
 // Names are fixed by the CLI; parameters keep integration fixtures isolated.

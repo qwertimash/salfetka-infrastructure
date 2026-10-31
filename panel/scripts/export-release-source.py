@@ -30,7 +30,9 @@ def files():
         'panel/scripts/collect-node-licenses.py', 'panel/scripts/ci-release.sh',
         'mobile/scripts/fetch-core-sources.py', 'mobile/scripts/subscription_catalog.py',
         'mobile/core/routing/assets/geodata-tags-v1.json', 'mobile/core/routing/assets/registry-v1.json',
-        'panel/tests/compatibility/fixtures.json'])
+        'panel/tests/compatibility/fixtures.json', 'panel/tests/compatibility/manifest_test.go',
+        'services/traffic_observation.py', 'services/traffic_observation_sources.py',
+        'panel/tests/acceptance_installer_linux.py'])
     baseline = json.loads((ROOT / 'panel/third_party/mobile-baseline.lock.json').read_text())
     for dep in baseline['dependencies']:
         if dep['id'] in ('xray-core', 'gvisor'):

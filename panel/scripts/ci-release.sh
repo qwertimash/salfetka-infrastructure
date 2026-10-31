@@ -27,3 +27,10 @@ from pathlib import Path
 value={'version':sys.argv[1],'platform':'linux/'+sys.argv[2],'image_id':subprocess.check_output(['docker','image','inspect','--format={{.Id}}','salfetka-panel:'+sys.argv[1]],text=True).strip()}
 Path('dist/panel/image.json').write_text(json.dumps(value)+'\n')
 PY
+
+# Native systemd/Docker acceptance on the disposable runner, with fixture TLS.
+sudo mkdir -p /tmp/salfetka-qa-code
+sudo cp -R panel/scripts/installer /tmp/salfetka-qa-code/
+sudo sh -c 'printf "%s\n" disposable-lima-salfetka-qa > /run/salfetka-isolated-installer-qa'
+printf '%s\n' '127.0.0.1 panel.qa.test sub.qa.test node.qa.test' | sudo tee -a /etc/hosts >/dev/null
+sudo python3 panel/tests/acceptance_installer_linux.py "$PWD/dist/panel" "$PWD/dist/node"

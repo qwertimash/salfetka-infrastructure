@@ -223,8 +223,13 @@ class Manager:
             print('Уже установлена эта версия.'); return
         # Download/verify/load before any outage; journal survives process death.
         if 'panel' in wanted: panel.load_image(directory / 'panel')
-        point = backup.create(self.root, state)
+        if state['phase'] == 'updating':
+            point = Path(pending['backup'])
+            backup.verify(point)
+        else:
+            point = backup.create(self.root, state)
         print('Резервная копия: ' + str(point))
+        self.journal('update', 'prepared', target=manifest['version'], selected=selected, backup=str(point))
         state['phase'] = 'updating'; self.commit(state)
         for component in wanted:
             self.journal('update', component, target=manifest['version'], selected=selected, backup=str(point))
@@ -238,7 +243,7 @@ class Manager:
     def renew(self):
         state = self.state()
         if 'panel' not in state['components']: return
-        require(state['phase'] == 'ready', 'installation_operation_in_progress')
+        require(state['phase'] in ('ready', 'stopped', 'restored_stopped'), 'installation_operation_in_progress')
         from .common import run
         home = self.root / 'acme'
         run(['certbot', 'renew', '--non-interactive', '--config-dir', home / 'config',
@@ -249,12 +254,16 @@ class Manager:
         panel.owned(self.root / 'panel')
         system.install_public_pair(target, cert, key, [config['admin_domain'], config['subscription_domain']])
         for path in target.iterdir(): os.chown(path, 0, 65532); path.chmod(0o640)
-        panel.compose(self.root / 'panel', 'exec', '-T', 'edge', 'nginx', '-t')
-        panel.compose(self.root / 'panel', 'exec', '-T', 'edge', 'nginx', '-s', 'reload')
+        if state['phase'] == 'ready':
+            panel.compose(self.root / 'panel', 'exec', '-T', 'edge', 'nginx', '-t')
+            panel.compose(self.root / 'panel', 'exec', '-T', 'edge', 'nginx', '-s', 'reload')
 
     def status(self):
         state = self.state()
         print(json.dumps({'phase': state['phase'], 'components': state['components']}, ensure_ascii=False, indent=2))
+        if state['phase'] != 'ready':
+            print('Установка не отмечена работающей; этап операции: /opt/salfetka-manager/transaction.json')
+            return
         if 'panel' in state['components']: panel.health(self.root / 'panel')
         if 'node' in state['components']: node.health()
         print('Проверка работающих служб и защищённой связи: OK')
@@ -276,8 +285,13 @@ def main():
         manager = Manager(token_file=args.github_token_file)
         if not args.operation:
             if (ROOT / 'state.json').exists():
-                print('1 — состояние; 2 — проверить обновления; 3 — обновить; 4 — резервная копия; 5 — восстановить; 6 — запустить; 7 — остановить')
-                args.operation = {'1': 'status', '2': 'check', '3': 'update', '4': 'backup', '5': 'restore', '6': 'start', '7': 'stop'}.get(input('Выбор: ').strip())
+                current = manager.state()
+                if current['phase'] == 'installing':
+                    print('Есть незавершённая установка. Продолжение сохранит созданные ключи и данные.')
+                    args.operation, args.role = 'install', current['config']['role']
+                else:
+                    print('1 — состояние; 2 — проверить обновления; 3 — обновить; 4 — резервная копия; 5 — восстановить; 6 — запустить; 7 — остановить')
+                    args.operation = {'1': 'status', '2': 'check', '3': 'update', '4': 'backup', '5': 'restore', '6': 'start', '7': 'stop'}.get(input('Выбор: ').strip())
             else:
                 print('1 — панель и нода; 2 — только нода; 3 — только панель')
                 args.role = {'1': 'both', '2': 'node', '3': 'panel'}.get(input('Выбор: ').strip()); args.operation = 'install'
@@ -308,6 +322,7 @@ def main():
         else:
             from .common import run
             state = manager.state()
+            require(state['phase'] in ('ready', 'stopped', 'restored_stopped'), 'finish_pending_operation_first')
             require(confirm('Запустить службы?' if args.operation == 'start' else 'Остановить службы?'), 'operation_cancelled')
             if 'panel' in state['components']:
                 panel.owned(ROOT / 'panel')
@@ -317,4 +332,8 @@ def main():
                 package = ROOT / 'releases' / state['components']['node']['version'] / 'node'
                 node.owned(package); run(['systemctl', args.operation, node.SERVICE])
             if args.operation == 'start':
-                manager.status(); state['phase'] = 'ready'; manager.commit(state)
+                if 'panel' in state['components']: panel.health(ROOT / 'panel')
+                if 'node' in state['components']: node.health()
+                state['phase'] = 'ready'; manager.commit(state)
+            else:
+                state['phase'] = 'stopped'; manager.commit(state)

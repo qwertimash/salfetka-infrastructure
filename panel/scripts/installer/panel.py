@@ -81,8 +81,10 @@ def stage(home, package, config, image, public_cert, public_key):
     existing = run(['docker', 'ps', '-aq', '--filter', 'label=com.docker.compose.project=' + PROJECT]).strip()
     volumes = run(['docker', 'volume', 'ls', '-q', '--filter', 'label=com.docker.compose.project=' + PROJECT]).strip()
     require(not existing and not volumes, 'foreign_compose_project_preserved')
+    final_home = home
+    home = home.parent / ('.panel-stage-' + uuid.uuid4().hex)
     home.mkdir(mode=0o700)
-    # Staging has no external effects; a partial home is retained for diagnosis.
+    # No external effects before the completed directory is atomically published.
     run([package / 'artifacts/bin/panelctl', 'prepare', '--dir', home / 'secrets'])
     secret = home / 'secrets'
     (secret / 'tls.crt').unlink(); (secret / 'tls.key').unlink()
@@ -117,11 +119,12 @@ def stage(home, package, config, image, public_cert, public_key):
     atomic(home / 'edge.conf', edge_config(config), 0o644)
     atomic(home / 'compose.env', (f"PANEL_IMAGE={image['image_id']}\nPANEL_UID=0\nPANEL_GID=0\nPANEL_ADMIN_PORT=18443\n"
            f"PANEL_SUBSCRIPTION_ORIGIN={sub_origin}\n").encode())
-    owner = {'schema': 2, 'home': str(home), 'project': PROJECT, 'version': image['version'],
+    owner = {'schema': 2, 'home': str(final_home), 'project': PROJECT, 'version': image['version'],
              'image_id': image['image_id'], 'admin_origin': admin_origin, 'subscription_origin': sub_origin,
              'machine_origin': machine_origin}
     record(home, doc, owner)
     compose(home, 'config', '--quiet')
+    home.rename(final_home)
     return owner
 
 
@@ -211,6 +214,10 @@ def update(home, package, target):
     env = [f"PANEL_IMAGE={image['image_id']}" if line.startswith('PANEL_IMAGE=') else line for line in env]
     atomic(Path(home) / 'compose.env', ('\n'.join(env) + '\n').encode())
     compose(home, 'run', '--rm', 'setup', 'migrate')
+    from urllib.parse import urlsplit
+    role = urlsplit(regular(Path(home) / 'secrets/database-runtime-url', private=True).decode().strip()).username
+    require(re.fullmatch(r'panel_runtime(?:_restore_[a-f0-9]{12})?', role), 'runtime_role_invalid')
+    compose(home, 'run', '--rm', 'setup', 'provision-runtime', '--password-file', '/run/panel/runtime-password', '--runtime-role', role)
     compose(home, 'up', '-d', 'admin', 'delivery', 'worker', 'edge')
     health(home)
     owner.update(version=target, image_id=image['image_id'])

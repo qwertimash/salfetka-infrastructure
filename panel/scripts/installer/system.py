@@ -20,7 +20,10 @@ def platform_id():
 
 
 def dependencies(panel=False):
-    data = dict(line.split('=', 1) for line in regular('/etc/os-release').decode().splitlines() if '=' in line)
+    release = Path('/etc/os-release').resolve()
+    require(release in (Path('/etc/os-release'), Path('/usr/lib/os-release'))
+            and release.stat().st_uid == 0 and release.stat().st_mode & 0o022 == 0, 'os_release_untrusted')
+    data = dict(line.split('=', 1) for line in regular(release).decode().splitlines() if '=' in line)
     require(data.get('ID', '').strip('"') == 'ubuntu' and data.get('VERSION_ID', '').strip('"') == '24.04', 'supported_os_ubuntu_24_04_required')
     packages = ['ca-certificates', 'openssl', 'python3']
     if panel: packages += ['docker.io', 'docker-compose-v2', 'certbot']
