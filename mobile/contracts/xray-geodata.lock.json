@@ -1,0 +1,8 @@
+{
+  "provider": "Loyalsoldier/v2ray-rules-dat",
+  "release": "202610032254",
+  "files": [
+    {"name": "geoip.dat", "size": 16515432, "sha256": "391b522361c52804e486a98b53d97f3d9c1d3e4e4217bb34954774a0b456b9fd"},
+    {"name": "geosite.dat", "size": 11007091, "sha256": "59b6ed33176b6f03debcfa3105d42de268475ffa8a1e010f481985256e375262"}
+  ]
+}

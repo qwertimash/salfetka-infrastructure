@@ -1,0 +1,232 @@
+{
+  "name": "salfetka-pilot",
+  "services": {
+    "postgres": {
+      "image": "postgres:18.6-bookworm@sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c",
+      "environment": {
+        "POSTGRES_DB": "panel",
+        "POSTGRES_USER": "panel_migrator",
+        "POSTGRES_PASSWORD_FILE": "/run/panel/postgres-password"
+      },
+      "volumes": [
+        "pgdata:/var/lib/postgresql",
+        "./secrets/postgres-password:/run/panel/postgres-password:ro"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "pg_isready -U panel_migrator -d panel"
+        ],
+        "interval": "3s",
+        "timeout": "3s",
+        "retries": 20
+      },
+      "restart": "unless-stopped",
+      "cpus": 0.35,
+      "mem_limit": "384m",
+      "pids_limit": 128,
+      "logging": {
+        "driver": "local",
+        "options": {
+          "max-size": "5m",
+          "max-file": "3"
+        }
+      }
+    },
+    "setup": {
+      "image": "${PANEL_IMAGE:?set PANEL_IMAGE}",
+      "user": "${PANEL_UID:?set PANEL_UID}:${PANEL_GID:?set PANEL_GID}",
+      "read_only": true,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "tmpfs": [
+        "/tmp:size=16m,mode=1777"
+      ],
+      "restart": "no",
+      "pids_limit": 96,
+      "mem_limit": "128m",
+      "cpus": 0.25,
+      "logging": {
+        "driver": "local",
+        "options": {
+          "max-size": "5m",
+          "max-file": "3"
+        }
+      },
+      "depends_on": {
+        "postgres": {
+          "condition": "service_healthy"
+        }
+      },
+      "profiles": [
+        "tools"
+      ],
+      "entrypoint": [
+        "/app/panelctl"
+      ],
+      "environment": {
+        "PANEL_DATABASE_URL_FILE": "/run/panel/database-migrator-url",
+        "PANEL_ALLOW_LOCAL_DB_PLAINTEXT": "1"
+      },
+      "volumes": [
+        "./secrets:/run/panel"
+      ]
+    },
+    "admin": {
+      "image": "${PANEL_IMAGE:?set PANEL_IMAGE}",
+      "user": "${PANEL_UID:?set PANEL_UID}:${PANEL_GID:?set PANEL_GID}",
+      "read_only": true,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "tmpfs": [
+        "/tmp:size=16m,mode=1777"
+      ],
+      "restart": "unless-stopped",
+      "pids_limit": 96,
+      "mem_limit": "384m",
+      "cpus": 0.25,
+      "logging": {
+        "driver": "local",
+        "options": {
+          "max-size": "5m",
+          "max-file": "3"
+        }
+      },
+      "depends_on": {
+        "postgres": {
+          "condition": "service_healthy"
+        }
+      },
+      "environment": {
+        "PANEL_DATABASE_URL_FILE": "/run/panel/database-runtime-url",
+        "PANEL_ALLOW_LOCAL_DB_PLAINTEXT": "1",
+        "PANEL_MASTER_KEY_FILE": "/run/panel/master-key",
+        "PANEL_API_MODE": "admin",
+        "PANEL_LISTEN_ADDR": "0.0.0.0:18443",
+        "PANEL_PUBLIC_ORIGIN": "https://localhost:${PANEL_ADMIN_PORT:?set PANEL_ADMIN_PORT}",
+        "PANEL_SUBSCRIPTION_ORIGIN": "${PANEL_SUBSCRIPTION_ORIGIN:?set PANEL_SUBSCRIPTION_ORIGIN}",
+        "PANEL_TLS_CERT_FILE": "/run/panel/tls.crt",
+        "PANEL_TLS_KEY_FILE": "/run/panel/tls.key",
+        "PANEL_NODE_AUTHORITY_FILE": "/run/panel/node-authority",
+        "PANEL_NODE_SIGNER_FILE": "/run/panel/node-signer",
+        "PANEL_WEB_DIR": "/app/web",
+        "GOMEMLIMIT": "320MiB"
+      },
+      "volumes": [
+        "./secrets/database-runtime-url:/run/panel/database-runtime-url:ro",
+        "./secrets/master-key:/run/panel/master-key:ro",
+        "./secrets/tls.crt:/run/panel/tls.crt:ro",
+        "./secrets/tls.key:/run/panel/tls.key:ro",
+        "./secrets/node-authority:/run/panel/node-authority:ro",
+        "./secrets/node-signer:/run/panel/node-signer:ro"
+      ],
+      "ports": [
+        "127.0.0.1:${PANEL_ADMIN_PORT}:18443"
+      ]
+    },
+    "delivery": {
+      "image": "${PANEL_IMAGE:?set PANEL_IMAGE}",
+      "user": "${PANEL_UID:?set PANEL_UID}:${PANEL_GID:?set PANEL_GID}",
+      "read_only": true,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "tmpfs": [
+        "/tmp:size=16m,mode=1777"
+      ],
+      "restart": "unless-stopped",
+      "pids_limit": 96,
+      "mem_limit": "128m",
+      "cpus": 0.25,
+      "logging": {
+        "driver": "local",
+        "options": {
+          "max-size": "5m",
+          "max-file": "3"
+        }
+      },
+      "depends_on": {
+        "postgres": {
+          "condition": "service_healthy"
+        }
+      },
+      "environment": {
+        "PANEL_DATABASE_URL_FILE": "/run/panel/database-runtime-url",
+        "PANEL_ALLOW_LOCAL_DB_PLAINTEXT": "1",
+        "PANEL_MASTER_KEY_FILE": "/run/panel/master-key",
+        "PANEL_API_MODE": "delivery",
+        "PANEL_LISTEN_ADDR": "0.0.0.0:18483",
+        "PANEL_PUBLIC_ORIGIN": "${PANEL_SUBSCRIPTION_ORIGIN}",
+        "PANEL_TLS_CERT_FILE": "/run/panel/delivery.crt",
+        "PANEL_TLS_KEY_FILE": "/run/panel/delivery.key",
+        "GOMEMLIMIT": "96MiB"
+      },
+      "volumes": [
+        "./secrets/database-runtime-url:/run/panel/database-runtime-url:ro",
+        "./secrets/master-key:/run/panel/master-key:ro",
+        "./secrets/delivery.crt:/run/panel/delivery.crt:ro",
+        "./secrets/delivery.key:/run/panel/delivery.key:ro"
+      ],
+      "ports": [
+        "${PANEL_DELIVERY_BIND:?set PANEL_DELIVERY_BIND}:${PANEL_DELIVERY_PORT:?set PANEL_DELIVERY_PORT}:18483"
+      ]
+    },
+    "worker": {
+      "image": "${PANEL_IMAGE:?set PANEL_IMAGE}",
+      "user": "${PANEL_UID:?set PANEL_UID}:${PANEL_GID:?set PANEL_GID}",
+      "read_only": true,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "tmpfs": [
+        "/tmp:size=16m,mode=1777"
+      ],
+      "restart": "unless-stopped",
+      "pids_limit": 96,
+      "mem_limit": "96m",
+      "cpus": 0.15,
+      "logging": {
+        "driver": "local",
+        "options": {
+          "max-size": "5m",
+          "max-file": "3"
+        }
+      },
+      "depends_on": {
+        "postgres": {
+          "condition": "service_healthy"
+        }
+      },
+      "entrypoint": [
+        "/app/panel-worker"
+      ],
+      "environment": {
+        "PANEL_DATABASE_URL_FILE": "/run/panel/database-runtime-url",
+        "PANEL_ALLOW_LOCAL_DB_PLAINTEXT": "1",
+        "PANEL_MASTER_KEY_FILE": "/run/panel/master-key",
+        "GOMEMLIMIT": "72MiB"
+      },
+      "volumes": [
+        "./secrets/database-runtime-url:/run/panel/database-runtime-url:ro",
+        "./secrets/master-key:/run/panel/master-key:ro"
+      ]
+    }
+  },
+  "volumes": {
+    "pgdata": {}
+  }
+}

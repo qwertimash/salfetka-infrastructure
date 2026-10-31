@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "base_contract": "panel/contracts/backend-pins.json",
+  "base_tree_sha256": "c10ca91fbf38f274bc6c6b9e780bdb50f378f222a059b97ea531c1765f2c6055",
+  "license": "MPL-2.0",
+  "patches": [
+    {
+      "path": "panel/third_party/patches/xray-server/0001-vless-owned-session-revoke.patch",
+      "sha256": "690e99e32d6be0de9ed6bcfa5c8e97fd31db7d9c21b77a34bdea296be6680c66"
+    },
+    {
+      "path": "panel/third_party/patches/xray-server/0002-hysteria-carrier-revoke.patch",
+      "sha256": "360515122c2b22400a1807cbf6c72ef94f199936fb8f3345bfef168d0ab1a945"
+    },
+    {
+      "path": "panel/third_party/patches/xray-server/0003-authenticated-traffic-gate.patch",
+      "sha256": "01da6171db67132b9e746c575b68cc3afd8cd895571ef1bebb6df1e132648afb"
+    }
+  ],
+  "scope": "Server-only VLESS/Hy2 owned-session revoke and opt-in authenticated traffic gate; acceptance recorded separately",
+  "base_contract_sha256": "054f7dea23d917cd36c5d02c3242690c562a7b7335a19b81db6c9a84664fa8ee",
+  "server_tree_sha256": "6c0619eb7db0a35668e27dc8d6a00b8a1bec43ddaefaec941a3e8d1875dfa689"
+}

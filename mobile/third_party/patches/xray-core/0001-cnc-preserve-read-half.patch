@@ -1,0 +1,82 @@
+diff --git a/common/net/cnc/connection.go b/common/net/cnc/connection.go
+--- a/common/net/cnc/connection.go
++++ b/common/net/cnc/connection.go
+@@ -122,6 +122,12 @@
+ 	return c.writer.WriteMultiBuffer(mb)
+ }
+ 
++// CloseWrite sends EOF to the outbound while preserving the response reader.
++// Local Salfetka embedding patch: TCP forwarding must preserve half-close.
++func (c *Connection) CloseWrite() error {
++	return common.Close(c.writer)
++}
++
+ // Close implements net.Conn.Close().
+ func (c *Connection) Close() error {
+ 	common.Must(c.done.Close())
+diff --git a/common/net/cnc/salfetka_halfclose_test.go b/common/net/cnc/salfetka_halfclose_test.go
+new file mode 100644
+--- /dev/null
++++ b/common/net/cnc/salfetka_halfclose_test.go
+@@ -0,0 +1,61 @@
++package cnc
++
++import (
++	"io"
++	"testing"
++	"time"
++
++	"github.com/xtls/xray-core/common/buf"
++	"github.com/xtls/xray-core/transport/pipe"
++)
++
++func TestSalfetkaCloseWritePreservesResponse(t *testing.T) {
++	requestReader, requestWriter := pipe.New()
++	responseReader, responseWriter := pipe.New()
++	connection := NewConnection(ConnectionInputMulti(requestWriter), ConnectionOutputMulti(responseReader))
++	defer connection.Close()
++	defer responseWriter.Close()
++	peerDone := make(chan error, 1)
++	go func() {
++		request, err := io.ReadAll(&buf.BufferedReader{Reader: requestReader})
++		if err != nil {
++			peerDone <- err
++			return
++		}
++		if string(request) != "request" {
++			peerDone <- io.ErrUnexpectedEOF
++			return
++		}
++		err = responseWriter.WriteMultiBuffer(buf.MergeBytes(nil, []byte("response after EOF")))
++		_ = responseWriter.Close()
++		peerDone <- err
++	}()
++	if _, err := connection.Write([]byte("request")); err != nil {
++		t.Fatal(err)
++	}
++	if err := connection.(interface{ CloseWrite() error }).CloseWrite(); err != nil {
++		t.Fatal(err)
++	}
++	result := make(chan error, 1)
++	go func() {
++		response, err := io.ReadAll(connection)
++		if err == nil && string(response) != "response after EOF" {
++			err = io.ErrUnexpectedEOF
++		}
++		result <- err
++	}()
++	select {
++	case err := <-result:
++		if err != nil {
++			t.Fatal(err)
++		}
++	case <-time.After(2 * time.Second):
++		t.Fatal("response half was closed or EOF was not sent")
++	}
++	if err := <-peerDone; err != nil {
++		t.Fatal(err)
++	}
++	if _, err := connection.Write([]byte("late")); err == nil {
++		t.Fatal("write remained open")
++	}
++}

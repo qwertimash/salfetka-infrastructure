@@ -1,0 +1,957 @@
+diff --git a/app/dns/cache_controller.go b/app/dns/cache_controller.go
+--- a/app/dns/cache_controller.go
++++ b/app/dns/cache_controller.go
+@@ -7,7 +7,6 @@
+ 	"sync"
+ 	"time"
+ 
+-	"github.com/xtls/xray-core/common"
+ 	"github.com/xtls/xray-core/common/errors"
+ 	"github.com/xtls/xray-core/common/signal/pubsub"
+ 	"github.com/xtls/xray-core/common/task"
+@@ -25,6 +24,8 @@
+ )
+ 
+ type CacheController struct {
++	ownedTimerMu    sync.Mutex
++	ownedClosed     bool
+ 	name            string
+ 	disableCache    bool
+ 	serveStale      bool
+@@ -304,7 +305,7 @@
+ 	errors.LogInfo(context.Background(), c.name, " got answer: ", req.domain, " ", req.reqType, " -> ", rep.IP, ", rtt: ", rtt, ", lock: ", lockWait)
+ 
+ 	if !c.serveStale || c.serveExpiredTTL != 0 {
+-		common.Must(c.cacheCleanup.Start())
++		c.startOwnedCleanup()
+ 	}
+ }
+ 
+diff --git a/app/dns/dns.go b/app/dns/dns.go
+--- a/app/dns/dns.go
++++ b/app/dns/dns.go
+@@ -28,6 +28,7 @@
+ 	hosts                  *StaticHosts
+ 	clients                []*Client
+ 	ctx                    context.Context
++	owner                  *dnsOwner
+ 	domainMatcher          geodata.DomainMatcher
+ 	matcherInfos           []*DomainMatcherInfo
+ 	checkSystem            bool
+@@ -92,6 +93,14 @@
+ 	}
+ 
+ 	clients := make([]*Client, 0, len(config.NameServer))
++	ctx, owner := newDNSOwnedContext(ctx)
++	constructed := false
++	defer func() {
++		if !constructed {
++			owner.cancelTasks()
++			owner.wait()
++		}
++	}()
+ 	matcherInfos := make([]*DomainMatcherInfo, 0)
+ 	effectiveRules := make([]*geodata.DomainRule, 0)
+ 
+@@ -169,11 +178,13 @@
+ 		clients = append(clients, NewLocalDNSClientWithContext(ctx, ipOption))
+ 	}
+ 
++	constructed = true
+ 	return &DNS{
+ 		hosts:                  hosts,
+ 		ipOption:               &ipOption,
+ 		clients:                clients,
+ 		ctx:                    ctx,
++		owner:                  owner,
+ 		domainMatcher:          domainMatcher,
+ 		matcherInfos:           matcherInfos,
+ 		disableFallback:        config.DisableFallback,
+@@ -195,7 +206,12 @@
+ 
+ // Close implements common.Closable.
+ func (s *DNS) Close() error {
+-	return nil
++	if s.owner != nil {
++		s.owner.closeOnce.Do(func() { s.owner.closeErr = s.closeOwnedClients() })
++		return s.owner.closeErr
++	} else {
++		return s.closeOwnedClients()
++	}
+ }
+ 
+ // IsOwnLink implements proxy.dns.ownLinkVerifier
+@@ -236,6 +252,11 @@
+ 
+ // LookupIP implements dns.Client.
+ func (s *DNS) LookupIP(domain string, option dns.IPOption) ([]net.IP, uint32, error) {
++	_, done, ok := beginDNSOwnedTask(s.ctx)
++	if !ok {
++		return nil, 0, context.Canceled
++	}
++	defer done()
+ 	// Normalize the FQDN form query
+ 	domain = strings.TrimSuffix(domain, ".")
+ 	if domain == "" {
+@@ -481,13 +502,18 @@
+ 			continue
+ 		}
+ 
++		qctx, done, ok := beginDNSOwnedTask(ctx)
++		if !client.server.IsDisableCache() {
++			done()
++			qctx, done, ok = detachDNSOwnedTask(ctx, client.timeoutMs*2)
++		}
++		if !ok {
++			done()
++			ch <- queryResult{err: context.Canceled, index: i}
++			continue
++		}
+ 		go func(i int, c *Client) {
+-			qctx := ctx
+-			if !c.server.IsDisableCache() {
+-				nctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), c.timeoutMs*2)
+-				qctx = nctx
+-				defer cancel()
+-			}
++			defer done()
+ 			ips, ttl, err := c.QueryIP(qctx, domain, option)
+ 			ch <- queryResult{ips: ips, ttl: ttl, err: err, index: i}
+ 		}(i, client)
+diff --git a/app/dns/dnscommon.go b/app/dns/dnscommon.go
+--- a/app/dns/dnscommon.go
++++ b/app/dns/dnscommon.go
+@@ -259,6 +259,7 @@
+ // toDnsContext create a new background context with parent inbound, session and dns log
+ func toDnsContext(ctx context.Context, addr string) context.Context {
+ 	dnsCtx := core.ToBackgroundDetachedContext(ctx)
++	dnsCtx = inheritDNSOwnedContext(dnsCtx, ctx)
+ 	if inbound := session.InboundFromContext(ctx); inbound != nil {
+ 		dnsCtx = session.ContextWithInbound(dnsCtx, inbound)
+ 	}
+diff --git a/app/dns/nameserver_cached.go b/app/dns/nameserver_cached.go
+--- a/app/dns/nameserver_cached.go
++++ b/app/dns/nameserver_cached.go
+@@ -35,7 +35,7 @@
+ 				if cache.serveStale && (cache.serveExpiredTTL == 0 || cache.serveExpiredTTL < ttl) {
+ 					errors.LogDebugInner(ctx, err, cache.name, " cache OPTIMISTE ", fqdn, " -> ", ips)
+ 					log.Record(&log.DNSLog{Server: cache.name, Domain: fqdn, Result: ips, Status: log.DNSCacheOptimiste, Elapsed: 0, Error: err})
+-					go pull(ctx, s, fqdn, option)
++					startDNSPull(ctx, s, fqdn, option)
+ 					return ips, 1, err
+ 				}
+ 			}
+@@ -48,10 +48,22 @@
+ }
+ 
+ func pull(ctx context.Context, s CachedNameserver, fqdn string, option dns.IPOption) {
+-	nctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 8*time.Second)
++	nctx, cancel, ok := detachDNSOwnedTask(ctx, 8*time.Second)
+ 	defer cancel()
++	if !ok {
++		return
++	}
+ 
+ 	fetch(nctx, s, fqdn, option)
++}
++
++func startDNSPull(ctx context.Context, s CachedNameserver, fqdn string, option dns.IPOption) {
++	nctx, done, ok := detachDNSOwnedTask(ctx, 8*time.Second)
++	if !ok {
++		done()
++		return
++	}
++	go func() { defer done(); fetch(nctx, s, fqdn, option) }()
+ }
+ 
+ func fetch(ctx context.Context, s CachedNameserver, fqdn string, option dns.IPOption) ([]net.IP, uint32, error) {
+diff --git a/app/dns/nameserver_doh.go b/app/dns/nameserver_doh.go
+--- a/app/dns/nameserver_doh.go
++++ b/app/dns/nameserver_doh.go
+@@ -8,6 +8,7 @@
+ 	"io"
+ 	"net/http"
+ 	"net/url"
++	"sync"
+ 	"time"
+ 
+ 	utls "github.com/refraction-networking/utls"
+@@ -30,6 +31,9 @@
+ // which is compatible with traditional dns over udp(RFC1035),
+ // thus most of the DOH implementation is copied from udpns.go
+ type DoHNameServer struct {
++	ownedMu         sync.Mutex
++	ownedClosed     bool
++	ownedConns      map[*dnsOwnedConn]struct{}
+ 	cacheController *CacheController
+ 	httpClient      *http.Client
+ 	dohURL          string
+@@ -98,9 +102,14 @@
+ 						return nil, err
+ 					}
+ 				}
++				conn, err = s.ownDNSConn(conn)
++				if err != nil {
++					return nil, err
++				}
+ 				if !h2c {
+ 					conn = utls.UClient(conn, &utls.Config{ServerName: url.Hostname()}, utls.HelloChrome_Auto)
+ 					if err := conn.(*utls.UConn).HandshakeContext(ctx); err != nil {
++						conn.Close()
+ 						return nil, err
+ 					}
+ 				}
+@@ -172,10 +181,16 @@
+ 	}
+ 
+ 	for _, req := range reqs {
++		ownedCtx, done, ok := beginDNSOwnedTask(ctx)
++		if !ok {
++			done()
++			return
++		}
+ 		go func(r *dnsRequest) {
++			defer done()
+ 			// generate new context for each req, using same context
+ 			// may cause reqs all aborted if any one encounter an error
+-			dnsCtx := ctx
++			dnsCtx := ownedCtx
+ 
+ 			// reserve internal dns server requested Inbound
+ 			if inbound := session.InboundFromContext(ctx); inbound != nil {
+diff --git a/app/dns/nameserver_quic.go b/app/dns/nameserver_quic.go
+--- a/app/dns/nameserver_quic.go
++++ b/app/dns/nameserver_quic.go
+@@ -33,6 +33,7 @@
+ 	cacheController *CacheController
+ 	destination     *net.Destination
+ 	connection      *quic.Conn
++	closed          bool
+ 	clientIP        net.IP
+ }
+ 
+@@ -101,10 +102,16 @@
+ 	}
+ 
+ 	for _, req := range reqs {
++		ownedCtx, done, ok := beginDNSOwnedTask(ctx)
++		if !ok {
++			done()
++			return
++		}
+ 		go func(r *dnsRequest) {
++			defer done()
+ 			// generate new context for each req, using same context
+ 			// may cause reqs all aborted if any one encounter an error
+-			dnsCtx := ctx
++			dnsCtx := ownedCtx
+ 
+ 			// reserve internal dns server requested Inbound
+ 			if inbound := session.InboundFromContext(ctx); inbound != nil {
+@@ -227,6 +234,10 @@
+ func (s *QUICNameServer) getConnection(ctx context.Context) (*quic.Conn, error) {
+ 	var conn *quic.Conn
+ 	s.RLock()
++	if s.closed {
++		s.RUnlock()
++		return nil, context.Canceled
++	}
+ 	conn = s.connection
+ 	if conn != nil && isActive(conn) {
+ 		s.RUnlock()
+@@ -240,6 +251,9 @@
+ 
+ 	s.Lock()
+ 	defer s.Unlock()
++	if s.closed {
++		return nil, context.Canceled
++	}
+ 
+ 	var err error
+ 	conn, err = s.openConnection(ctx)
+@@ -286,7 +300,7 @@
+ 			context.AfterFunc(conn.Context(), func() { transport.Close(); packet.Close() })
+ 		}
+ 	} else {
+-		conn, err = quic.DialAddr(context.Background(), s.destination.NetAddr(), secureTLS, quicConfig)
++		conn, err = quic.DialAddr(ctx, s.destination.NetAddr(), secureTLS, quicConfig)
+ 	}
+ 	log.Record(&log.AccessMessage{
+ 		From:   "DNS",
+diff --git a/app/dns/nameserver_tcp.go b/app/dns/nameserver_tcp.go
+--- a/app/dns/nameserver_tcp.go
++++ b/app/dns/nameserver_tcp.go
+@@ -135,8 +135,14 @@
+ 	}
+ 
+ 	for _, req := range reqs {
++		ownedCtx, done, ok := beginDNSOwnedTask(ctx)
++		if !ok {
++			done()
++			return
++		}
+ 		go func(r *dnsRequest) {
+-			dnsCtx := ctx
++			defer done()
++			dnsCtx := ownedCtx
+ 
+ 			if inbound := session.InboundFromContext(ctx); inbound != nil {
+ 				dnsCtx = session.ContextWithInbound(dnsCtx, inbound)
+@@ -169,6 +175,8 @@
+ 				return
+ 			}
+ 			defer conn.Close()
++			stopOwnedCancellation := context.AfterFunc(dnsCtx, func() { conn.Close() })
++			defer stopOwnedCancellation()
+ 			dnsReqBuf := buf.New()
+ 			err = binary.Write(dnsReqBuf, binary.BigEndian, uint16(b.Len()))
+ 			if err != nil {
+diff --git a/app/dns/nameserver_udp.go b/app/dns/nameserver_udp.go
+--- a/app/dns/nameserver_udp.go
++++ b/app/dns/nameserver_udp.go
+@@ -21,6 +21,8 @@
+ 
+ // ClassicNameServer implemented traditional UDP DNS.
+ type ClassicNameServer struct {
++	ownedTimerMu sync.Mutex
++	ownedClosed  atomic.Bool
+ 	sync.RWMutex
+ 	cacheController *CacheController
+ 	address         *net.Destination
+@@ -145,11 +147,19 @@
+ 
+ func (s *ClassicNameServer) addPendingRequest(req *udpDnsRequest) {
+ 	s.Lock()
++	if s.ownedClosed.Load() {
++		s.Unlock()
++		return
++	}
+ 	id := req.msg.ID
+ 	req.expire = time.Now().Add(time.Second * 8)
+ 	s.requests[id] = req
+ 	s.Unlock()
+-	common.Must(s.requestsCleanup.Start())
++	s.ownedTimerMu.Lock()
++	if !s.ownedClosed.Load() {
++		common.Must(s.requestsCleanup.Start())
++	}
++	s.ownedTimerMu.Unlock()
+ }
+ 
+ // getCacheController implements CachedNameserver.
+diff --git a/app/dns/salfetka_owned_context.go b/app/dns/salfetka_owned_context.go
+new file mode 100644
+--- /dev/null
++++ b/app/dns/salfetka_owned_context.go
+@@ -0,0 +1,86 @@
++package dns
++
++import (
++	"context"
++	"sync"
++	"time"
++)
++
++type dnsOwnerKey struct{}
++type dnsOwner struct {
++	mu        sync.Mutex
++	ctx       context.Context
++	cancel    context.CancelFunc
++	closed    bool
++	tasks     sync.WaitGroup
++	closeOnce sync.Once
++	closeErr  error
++}
++
++func newDNSOwnedContext(ctx context.Context) (context.Context, *dnsOwner) {
++	ctx, cancel := context.WithCancel(ctx)
++	o := &dnsOwner{ctx: ctx, cancel: cancel}
++	return context.WithValue(ctx, dnsOwnerKey{}, o), o
++}
++func beginDNSOwnedTask(ctx context.Context) (context.Context, func(), bool) {
++	o, _ := ctx.Value(dnsOwnerKey{}).(*dnsOwner)
++	if o == nil {
++		return ctx, func() {}, true
++	}
++	o.mu.Lock()
++	if o.closed {
++		o.mu.Unlock()
++		return ctx, func() {}, false
++	}
++	o.tasks.Add(1)
++	o.mu.Unlock()
++	ctx, cancel := context.WithCancel(ctx)
++	stop := context.AfterFunc(o.ctx, cancel)
++	var once sync.Once
++	return ctx, func() { once.Do(func() { stop(); cancel(); o.tasks.Done() }) }, true
++}
++func detachDNSOwnedTask(ctx context.Context, timeout time.Duration) (context.Context, func(), bool) {
++	detached, cancel := context.WithTimeout(context.WithoutCancel(ctx), timeout)
++	owned, done, ok := beginDNSOwnedTask(detached)
++	return owned, func() { done(); cancel() }, ok
++}
++func inheritDNSOwnedContext(destination, source context.Context) context.Context {
++	o, _ := source.Value(dnsOwnerKey{}).(*dnsOwner)
++	if o == nil {
++		return destination
++	}
++	// DNS contexts deliberately detach from individual requests. Reuse the owner
++	// lifetime without registering one retained cancellation callback per query.
++	return dnsOwnedInheritedContext{Context: o.ctx, values: destination, owner: o}
++}
++
++type dnsOwnedInheritedContext struct {
++	context.Context
++	values context.Context
++	owner  *dnsOwner
++}
++
++func (c dnsOwnedInheritedContext) Value(key any) any {
++	if _, ok := key.(dnsOwnerKey); ok {
++		return c.owner
++	}
++	return c.values.Value(key)
++}
++
++func (c dnsOwnedInheritedContext) AfterFunc(f func()) func() bool {
++	return context.AfterFunc(c.Context, f)
++}
++func (o *dnsOwner) cancelTasks() {
++	if o == nil {
++		return
++	}
++	o.mu.Lock()
++	o.closed = true
++	o.cancel()
++	o.mu.Unlock()
++}
++func (o *dnsOwner) wait() {
++	if o != nil {
++		o.tasks.Wait()
++	}
++}
+diff --git a/app/dns/salfetka_owned_transports.go b/app/dns/salfetka_owned_transports.go
+new file mode 100644
+--- /dev/null
++++ b/app/dns/salfetka_owned_transports.go
+@@ -0,0 +1,108 @@
++package dns
++
++import (
++	"context"
++	"github.com/xtls/xray-core/common"
++	"github.com/xtls/xray-core/common/errors"
++	"net"
++)
++
++func (s *DNS) closeOwnedClients() error {
++	var errs []error
++	s.owner.cancelTasks()
++	for _, client := range s.clients {
++		if closer, ok := client.server.(interface{ Close() error }); ok {
++			if err := closer.Close(); err != nil {
++				errs = append(errs, err)
++			}
++		}
++	}
++	s.owner.wait()
++	for _, client := range s.clients {
++		if cached, ok := client.server.(CachedNameserver); ok {
++			cached.getCacheController().closeOwnedCleanup()
++		}
++	}
++	return errors.Combine(errs...)
++}
++func (c *CacheController) startOwnedCleanup() {
++	c.ownedTimerMu.Lock()
++	defer c.ownedTimerMu.Unlock()
++	if !c.ownedClosed {
++		common.Must(c.cacheCleanup.Start())
++	}
++}
++func (c *CacheController) closeOwnedCleanup() {
++	c.ownedTimerMu.Lock()
++	defer c.ownedTimerMu.Unlock()
++	c.ownedClosed = true
++	c.cacheCleanup.Close()
++}
++func (s *ClassicNameServer) Close() error {
++	s.ownedClosed.Store(true)
++	if s.udpServer != nil {
++		s.udpServer.RemoveRay()
++	}
++	s.ownedTimerMu.Lock()
++	s.requestsCleanup.Close()
++	s.ownedTimerMu.Unlock()
++	s.Lock()
++	s.requests = make(map[uint16]*udpDnsRequest)
++	s.Unlock()
++	return nil
++}
++
++type dnsOwnedConn struct {
++	net.Conn
++	owner *DoHNameServer
++}
++
++func (c *dnsOwnedConn) Close() error {
++	c.owner.ownedMu.Lock()
++	delete(c.owner.ownedConns, c)
++	c.owner.ownedMu.Unlock()
++	return c.Conn.Close()
++}
++func (s *DoHNameServer) ownDNSConn(c net.Conn) (net.Conn, error) {
++	s.ownedMu.Lock()
++	if s.ownedClosed {
++		s.ownedMu.Unlock()
++		c.Close()
++		return nil, context.Canceled
++	}
++	if s.ownedConns == nil {
++		s.ownedConns = make(map[*dnsOwnedConn]struct{})
++	}
++	w := &dnsOwnedConn{Conn: c, owner: s}
++	s.ownedConns[w] = struct{}{}
++	s.ownedMu.Unlock()
++	return w, nil
++}
++func (s *DoHNameServer) Close() error {
++	s.ownedMu.Lock()
++	s.ownedClosed = true
++	conns := make([]*dnsOwnedConn, 0, len(s.ownedConns))
++	for c := range s.ownedConns {
++		conns = append(conns, c)
++	}
++	s.ownedConns = nil
++	s.ownedMu.Unlock()
++	for _, c := range conns {
++		c.Close()
++	}
++	if s.httpClient != nil {
++		s.httpClient.CloseIdleConnections()
++	}
++	return nil
++}
++func (s *QUICNameServer) Close() error {
++	s.Lock()
++	s.closed = true
++	c := s.connection
++	s.connection = nil
++	s.Unlock()
++	if c != nil {
++		return c.CloseWithError(0, "")
++	}
++	return nil
++}
+diff --git a/app/dns/salfetka_owned_cleanup_test.go b/app/dns/salfetka_owned_cleanup_test.go
+new file mode 100644
+--- /dev/null
++++ b/app/dns/salfetka_owned_cleanup_test.go
+@@ -0,0 +1,358 @@
++package dns
++
++import (
++	"context"
++	"crypto/tls"
++	"crypto/x509"
++	"encoding/binary"
++	"fmt"
++	"io"
++	"net"
++	"net/http"
++	"net/http/httptest"
++	"net/url"
++	"strings"
++	"sync"
++	"sync/atomic"
++	"testing"
++	"time"
++
++	"github.com/apernet/quic-go"
++	feature "github.com/xtls/xray-core/features/dns"
++	"golang.org/x/net/dns/dnsmessage"
++	"golang.org/x/net/http2"
++)
++
++// These fixtures only use ephemeral loopback listeners and a fixture CA. They
++// never disable TLS verification, contact a provider, or replace global roots.
++func salfetkaDNSAnswer(t *testing.T, payload []byte) ([]byte, string) {
++	t.Helper()
++	var query dnsmessage.Message
++	if err := query.Unpack(payload); err != nil || len(query.Questions) != 1 {
++		return nil, ""
++	}
++	question := query.Questions[0]
++	answer := dnsmessage.Message{Header: dnsmessage.Header{ID: query.ID, Response: true,
++		RecursionAvailable: true}, Questions: query.Questions}
++	if question.Type == dnsmessage.TypeA {
++		answer.Answers = []dnsmessage.Resource{{Header: dnsmessage.ResourceHeader{Name: question.Name,
++			Type: dnsmessage.TypeA, Class: dnsmessage.ClassINET, TTL: 60},
++			Body: &dnsmessage.AResource{A: [4]byte{192, 0, 2, 42}}}}
++	}
++	encoded, err := answer.Pack()
++	if err != nil {
++		t.Error("synthetic DNS answer", err)
++	}
++	return encoded, question.Name.String()
++}
++
++func salfetkaDNSFeature(t *testing.T, server Server) *DNS {
++	t.Helper()
++	ctx, owner := newDNSOwnedContext(context.Background())
++	hosts, err := NewStaticHosts(nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	option := &feature.IPOption{IPv4Enable: true}
++	return &DNS{ctx: ctx, owner: owner, hosts: hosts, ipOption: option,
++		clients: []*Client{{server: server, ipOption: option, timeoutMs: 5 * time.Second}}}
++}
++
++func salfetkaDNSLookup(t *testing.T, owner *DNS, domain string) {
++	t.Helper()
++	ips, _, err := owner.LookupIP(domain, feature.IPOption{IPv4Enable: true})
++	if err != nil || len(ips) != 1 || !ips[0].Equal(net.IPv4(192, 0, 2, 42)) {
++		t.Fatal("verified fixture lookup", err, ips)
++	}
++}
++
++func TestSalfetkaDNSCloseOwnsDoHActiveIdleAndLateSockets(t *testing.T) {
++	var requests atomic.Int32
++	var mu sync.Mutex
++	live := map[net.Conn]bool{}
++	blocked := make(chan struct{}, 4)
++	fixture := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		payload, err := io.ReadAll(io.LimitReader(r.Body, 4096))
++		if err != nil {
++			return
++		}
++		answer, name := salfetkaDNSAnswer(t, payload)
++		requests.Add(1)
++		if strings.HasPrefix(name, "blocked-") {
++			blocked <- struct{}{}
++			<-r.Context().Done()
++			return
++		}
++		w.Header().Set("Content-Type", "application/dns-message")
++		_, _ = w.Write(answer)
++	}))
++	fixture.EnableHTTP2 = true
++	fixture.Config.ConnState = func(c net.Conn, state http.ConnState) {
++		mu.Lock()
++		defer mu.Unlock()
++		if state == http.StateNew {
++			live[c] = true
++		}
++		if state == http.StateClosed {
++			delete(live, c)
++		}
++	}
++	fixture.StartTLS()
++	defer fixture.Close()
++	roots := x509.NewCertPool()
++	roots.AddCert(fixture.Certificate())
++	makeServer := func() *DoHNameServer {
++		u, _ := url.Parse(fixture.URL)
++		s := NewDoHNameServer(u, nil, false, false, false, 0, nil)
++		transport := s.httpClient.Transport.(*http2.Transport)
++		transport.DialTLSContext = func(ctx context.Context, network, address string, _ *tls.Config) (net.Conn, error) {
++			dialer := tls.Dialer{Config: &tls.Config{RootCAs: roots, NextProtos: []string{"h2"}}}
++			conn, err := dialer.DialContext(ctx, network, address)
++			if err != nil {
++				return nil, err
++			}
++			return s.ownDNSConn(conn)
++		}
++		return s
++	}
++	foreign := salfetkaDNSFeature(t, makeServer())
++	defer foreign.Close()
++	salfetkaDNSLookup(t, foreign, "foreign-first.fixture")
++	for run := 0; run < 3; run++ {
++		server := makeServer()
++		owner := salfetkaDNSFeature(t, server)
++		salfetkaDNSLookup(t, owner, fmt.Sprintf("owned-%d.fixture", run))
++		var activeDone chan error
++		if run > 0 {
++			activeDone = make(chan error, 1)
++			go func() {
++				_, _, err := owner.LookupIP(fmt.Sprintf("blocked-%d.fixture", run), feature.IPOption{IPv4Enable: true})
++				activeDone <- err
++			}()
++			select {
++			case <-blocked:
++			case <-time.After(time.Second):
++				t.Fatal("active DoH fixture did not receive query")
++			}
++		}
++		if err := owner.Close(); err != nil {
++			t.Fatal("owned Close", err)
++		}
++		if err := owner.Close(); err != nil {
++			t.Fatal("idempotent Close", err)
++		}
++		if activeDone != nil {
++			select {
++			case err := <-activeDone:
++				if err == nil {
++					t.Fatal("Close did not cancel active query")
++				}
++			case <-time.After(time.Second):
++				t.Fatal("Close left owned query running")
++			}
++		}
++		deadline := time.Now().Add(time.Second)
++		for {
++			mu.Lock()
++			count := len(live)
++			mu.Unlock()
++			if count == 1 {
++				break
++			}
++			if time.Now().After(deadline) {
++				t.Fatal("owned idle/active sockets remained, or foreign socket closed", count)
++			}
++			time.Sleep(time.Millisecond)
++		}
++		before := requests.Load()
++		if _, _, err := owner.LookupIP("after-close.fixture", feature.IPOption{IPv4Enable: true}); err == nil {
++			t.Fatal("closed owner admitted a new lookup")
++		}
++		if requests.Load() != before {
++			t.Fatal("closed owner sent another query")
++		}
++		late, peer := net.Pipe()
++		if conn, err := server.ownDNSConn(late); err == nil || conn != nil {
++			t.Fatal("late socket escaped closed owner")
++		}
++		_ = peer.SetReadDeadline(time.Now().Add(time.Second))
++		if _, err := peer.Read(make([]byte, 1)); err != io.EOF {
++			t.Fatal("late socket was not closed", err)
++		}
++		_ = peer.Close()
++		salfetkaDNSLookup(t, foreign, fmt.Sprintf("foreign-survives-%d.fixture", run))
++	}
++}
++
++func TestSalfetkaDNSCloseOwnsDoQConnectionAndRefusesReconnect(t *testing.T) {
++	// httptest supplies a test-only signed certificate with IP SANs; reuse it
++	// for verified QUIC instead of importing a system root or skipping verify.
++	certFixture := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
++	certificate, parsed := certFixture.TLS.Certificates[0], certFixture.Certificate()
++	certFixture.Close()
++	roots := x509.NewCertPool()
++	roots.AddCert(parsed)
++	listener, err := quic.ListenAddr("127.0.0.1:0", &tls.Config{Certificates: []tls.Certificate{certificate},
++		NextProtos: []string{NextProtoDQ}}, &quic.Config{})
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer listener.Close()
++	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
++	defer cancel()
++	serverConnections := make(chan *quic.Conn, 2)
++	go func() {
++		for n := 0; n < 2; n++ {
++			connection, err := listener.Accept(ctx)
++			if err != nil {
++				return
++			}
++			serverConnections <- connection
++		}
++	}()
++	makeServer := func() (*QUICNameServer, *DNS, *quic.Conn) {
++		connection, err := quic.DialAddr(ctx, listener.Addr().String(), &tls.Config{RootCAs: roots,
++			ServerName: "127.0.0.1", NextProtos: []string{NextProtoDQ}}, &quic.Config{})
++		if err != nil {
++			t.Fatal("verified QUIC fixture", err)
++		}
++		var remote *quic.Conn
++		select {
++		case remote = <-serverConnections:
++		case <-ctx.Done():
++			t.Fatal("QUIC fixture accept")
++		}
++		u, _ := url.Parse("quic+local://" + listener.Addr().String())
++		s, err := NewQUICNameServer(u, false, false, 0, nil)
++		if err != nil {
++			t.Fatal(err)
++		}
++		s.connection = connection
++		return s, salfetkaDNSFeature(t, s), remote
++	}
++	server, owner, remote := makeServer()
++	foreignServer, foreign, foreignRemote := makeServer()
++	defer foreign.Close()
++	var hits atomic.Int32
++	blocked := make(chan struct{}, 1)
++	serve := func(conn *quic.Conn, block bool) {
++		for {
++			stream, err := conn.AcceptStream(ctx)
++			if err != nil {
++				return
++			}
++			var length [2]byte
++			if _, err = io.ReadFull(stream, length[:]); err != nil {
++				return
++			}
++			payload := make([]byte, binary.BigEndian.Uint16(length[:]))
++			if _, err = io.ReadFull(stream, payload); err != nil {
++				return
++			}
++			answer, _ := salfetkaDNSAnswer(t, payload)
++			hits.Add(1)
++			if block {
++				blocked <- struct{}{}
++				<-conn.Context().Done()
++				return
++			}
++			binary.BigEndian.PutUint16(length[:], uint16(len(answer)))
++			_, _ = stream.Write(append(length[:], answer...))
++			_ = stream.Close()
++		}
++	}
++	go serve(remote, true)
++	go serve(foreignRemote, false)
++	salfetkaDNSLookup(t, foreign, "foreign-quic-first.fixture")
++	activeDone := make(chan error, 1)
++	go func() {
++		_, _, err := owner.LookupIP("blocked-quic.fixture", feature.IPOption{IPv4Enable: true})
++		activeDone <- err
++	}()
++	select {
++	case <-blocked:
++	case <-ctx.Done():
++		t.Fatal("owned active QUIC query missing")
++	}
++	if err := owner.Close(); err != nil {
++		t.Fatal(err)
++	}
++	select {
++	case <-remote.Context().Done():
++	case <-time.After(time.Second):
++		t.Fatal("owned QUIC connection remained open")
++	}
++	select {
++	case err := <-activeDone:
++		if err == nil {
++			t.Fatal("active QUIC query survived Close")
++		}
++	case <-time.After(time.Second):
++		t.Fatal("QUIC owned query was not drained")
++	}
++	if conn, err := server.getConnection(context.Background()); err == nil || conn != nil {
++		t.Fatal("closed QUIC server reconnected")
++	}
++	if _, err := foreignServer.getConnection(ctx); err != nil {
++		t.Fatal("foreign QUIC connection was closed", err)
++	}
++	salfetkaDNSLookup(t, foreign, "foreign-quic-survives.fixture")
++	if hits.Load() != 3 {
++		t.Fatal("unexpected owned reconnect or missing foreign lookup", hits.Load())
++	}
++}
++
++type salfetkaHeldCachedServer struct {
++	cache    *CacheController
++	queries  atomic.Int32
++	started  chan struct{}
++	finished chan struct{}
++}
++
++func (s *salfetkaHeldCachedServer) getCacheController() *CacheController { return s.cache }
++func (s *salfetkaHeldCachedServer) sendQuery(ctx context.Context, _ chan<- error, _ string, _ feature.IPOption) {
++	s.queries.Add(1)
++	close(s.started)
++	<-ctx.Done()
++	close(s.finished)
++}
++
++func TestSalfetkaDNSCloseCancelsDetachedStaleRefreshAndRefusesLatePull(t *testing.T) {
++	ctx, owner := newDNSOwnedContext(context.Background())
++	featureOwner := &DNS{ctx: ctx, owner: owner}
++	server := &salfetkaHeldCachedServer{cache: NewCacheController("synthetic-stale", true, true, 0),
++		started: make(chan struct{}), finished: make(chan struct{})}
++	request, requestCancel := context.WithCancel(ctx)
++	defer requestCancel()
++	startDNSPull(request, server, "stale.fixture.", feature.IPOption{IPv4Enable: true})
++	select {
++	case <-server.started:
++	case <-time.After(time.Second):
++		t.Fatal("stale refresh was not admitted")
++	}
++	requestCancel()
++	select {
++	case <-server.finished:
++		t.Fatal("stale refresh inherited foreground request cancellation")
++	default:
++	}
++	closed := make(chan error, 1)
++	go func() { closed <- featureOwner.Close() }()
++	select {
++	case err := <-closed:
++		if err != nil {
++			t.Fatal("owner Close failed", err)
++		}
++	case <-time.After(time.Second):
++		t.Fatal("Close waited for detached eight-second refresh deadline")
++	}
++	select {
++	case <-server.finished:
++	default:
++		t.Fatal("Close returned before owned refresh completed")
++	}
++	startDNSPull(ctx, server, "late-stale.fixture.", feature.IPOption{IPv4Enable: true})
++	if server.queries.Load() != 1 {
++		t.Fatal("closed owner admitted a late stale refresh")
++	}
++}
+diff --git a/app/dns/salfetka_owned_context_test.go b/app/dns/salfetka_owned_context_test.go
+new file mode 100644
+--- /dev/null
++++ b/app/dns/salfetka_owned_context_test.go
+@@ -0,0 +1,44 @@
++package dns
++
++import (
++	"context"
++	"testing"
++	"time"
++)
++
++func TestSalfetkaDNSInheritedContextUsesOwnerLifetimeWithoutQueryCallbacks(t *testing.T) {
++	type valueKey string
++	parent, cancel := context.WithDeadline(context.WithValue(context.Background(), valueKey("source"), "not inherited"), time.Now().Add(time.Minute))
++	defer cancel()
++	source, owner := newDNSOwnedContext(parent)
++	destination := context.WithValue(context.Background(), valueKey("destination"), "preserved")
++	for range 10000 {
++		inherited := inheritDNSOwnedContext(destination, source)
++		if inherited.Done() != owner.ctx.Done() {
++			t.Fatal("inherit created a query cancellation lifetime instead of reusing the owner")
++		}
++		if got := inherited.Value(valueKey("destination")); got != "preserved" {
++			t.Fatalf("destination value changed: %v", got)
++		}
++		if inherited.Value(valueKey("source")) != nil || inherited.Value(dnsOwnerKey{}) != owner {
++			t.Fatal("owner attachment leaked unrelated source values")
++		}
++		deadline, ok := inherited.Deadline()
++		expected, _ := owner.ctx.Deadline()
++		if !ok || !deadline.Equal(expected) {
++			t.Fatal("owner deadline lost")
++		}
++	}
++	inherited := inheritDNSOwnedContext(destination, source)
++	child, childCancel := context.WithCancel(inherited)
++	defer childCancel()
++	owner.cancelTasks()
++	select {
++	case <-child.Done():
++		if child.Err() != context.Canceled || inherited.Err() != context.Canceled {
++			t.Fatal("owner cancellation not inherited")
++		}
++	case <-time.After(time.Second):
++		t.Fatal("owner cancellation did not reach derived DNS work")
++	}
++}

@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "go_version": "go1.27.1",
+  "source_lock": "panel/third_party/mobile-baseline.lock.json",
+  "source_lock_sha256": "76cc79a4640ad40e27f6b724c4092489ce915732e3ae992c02a5d8a633101e28",
+  "toolchain_wrapper_sha256": "8f523c591f1503f9f94af1c189f277c5a48272ffd7bf6a379d3ff41ce326e08b",
+  "scope": "Immutable accepted panel baseline; mobile client may advance independently.",
+  "dependencies": [
+    {
+      "id": "olcrtc",
+      "commit": "f9edaa7f1ab5b00238eaf72b6dac7540dd344037",
+      "license_expression": "Apache-2.0",
+      "source_archive_sha256": "f6f7fdba898bfbb507b8dacc914fa68c3b640d18c35ffb1ca9a5239398e6de3f",
+      "patches": [
+        {
+          "path": "third_party/patches/olcrtc/0001-bootstrap-dns-tcp-fallback.patch",
+          "sha256": "dbf92136a1b440898ecfa3e354c39d0932e02556ca192522a205f4c179e51161"
+        },
+        {
+          "path": "third_party/patches/olcrtc/0002-direct-socket-scope.patch",
+          "sha256": "6d84341122df72a6b1016e79fec6b5786e2638b75d6a513b722574898c2cfa73"
+        }
+      ]
+    },
+    {
+      "id": "openflux",
+      "commit": "2ec01a5bf0404b70854bd4d319a5c67843958351",
+      "license_expression": "GPL-3.0-or-later",
+      "source_archive_sha256": "249ee195269e196165901d432756d800ac3324634052c56758b10e0e12bf3807",
+      "patches": [
+        {
+          "path": "third_party/patches/openflux/0001-packet-lifecycle-and-log-capture.patch",
+          "sha256": "e19cb4805eeb3bb2ce0ac7034f6b4c779dcf7792dac217a154bfe9da43641d92"
+        },
+        {
+          "path": "third_party/patches/openflux/0002-route-carrier-raw-logs.patch",
+          "sha256": "108307dc03bb53a56a9b3d7930a9616ab63f8532e4d09dc3ec44c878638c4b58"
+        },
+        {
+          "path": "third_party/patches/openflux/0003-silence-pion-logger.patch",
+          "sha256": "39860bd264832cd202ac5a7de0a004fc6f33823830868a0e3fbdfe0ead9f41ed"
+        },
+        {
+          "path": "third_party/patches/openflux/0004-boards-object-carrier.patch",
+          "sha256": "fd4175350b2f0e5821e8f9297ab1cbb7985d739252a6a7488551f130896185fd"
+        },
+        {
+          "path": "third_party/patches/openflux/0005-direct-socket-scope.patch",
+          "sha256": "eaca36330711c1c19e0183a5e12f2e99e401f95d45f2e1a84c87e7da2e35a7c5"
+        }
+      ]
+    },
+    {
+      "id": "xray-core",
+      "commit": "e5e85ca9dada936ae736197ad2b7a685972e8e0f",
+      "license_expression": "MPL-2.0",
+      "source_archive_sha256": "aa2ff911f14bc9a9ca55d5731370fb383bc060c526035dd0f9f72b81442ed9df",
+      "patches": [
+        {
+          "path": "third_party/patches/xray-core/0001-cnc-preserve-read-half.patch",
+          "sha256": "c65b2f6d17f191b4a4ff4087e3332d9d088d5dfdc53072ffa0d167689c322444"
+        },
+        {
+          "path": "third_party/patches/xray-core/0002-grpc-stream-close-ownership.patch",
+          "sha256": "17c27aa8e7f3c6c5c2e895a94862980affb52204d51c178450ff8771539cbb83"
+        },
+        {
+          "path": "third_party/patches/xray-core/0003-observatory-immutable-snapshots.patch",
+          "sha256": "e046444753dd1465254cbafbd80424eb8c73ebcdd2289fc5f0c142a2fc5265c0"
+        },
+        {
+          "path": "third_party/patches/xray-core/0004-owned-outbound-dialer-cleanup.patch",
+          "sha256": "4ae5ac3048bd896c00f6bfe5a1ae16c38e9176ad24386d5ac7d8ed4a884e231b"
+        },
+        {
+          "path": "third_party/patches/xray-core/0005-instance-owned-system-dns.patch",
+          "sha256": "ea19bf0ee696ea72ef19ddca17ac3a3ad0f827582a3cffaf1676fa6df5235d52"
+        },
+        {
+          "path": "third_party/patches/xray-core/0006-instance-owned-physical-network.patch",
+          "sha256": "1ea9da0ea737427e0fa69f7a23a924fb24b7a7dc4173bf55b708e594124edc21"
+        },
+        {
+          "path": "third_party/patches/xray-core/0007-instance-owned-dns-cleanup.patch",
+          "sha256": "09e38f71e01c60c7f7501bad7c0a3e327f004b0c961a1f9f21fb7030816bd672"
+        },
+        {
+          "path": "third_party/patches/xray-core/0008-owned-observatory-probes.patch",
+          "sha256": "5617cc72867e87e77a0380ff6d7163edf3050a47e8404e21585345766aa61a96"
+        },
+        {
+          "path": "third_party/patches/xray-core/0009-hysteria-cleaner-owner-isolation.patch",
+          "sha256": "caa24fe5a7f71f5f94a4457bdc254ceef42cb0344f27f0774fa2f048cf81e535"
+        },
+        {
+          "path": "third_party/patches/xray-core/0010-scoped-dns-address-families.patch",
+          "sha256": "db23b0996dcec4e3926efc1e2df8c1dca13207eef3b4dcd976e3d8708099ca67"
+        }
+      ]
+    },
+    {
+      "id": "gvisor",
+      "commit": "23ef90c42be712c5015852c325e5235282396539",
+      "license_expression": "Apache-2.0",
+      "source_archive_sha256": "139b3b908526ec1ba49b378532c0167300ce8136995ab045da0e2259f7bdd0bc",
+      "patches": [
+        {
+          "path": "third_party/patches/gvisor/0001-race-arm64-cas-register.patch",
+          "sha256": "b616acfdbaa718038f00ed17304b845af75a2e0e2bd133322f733355acdb42f1"
+        }
+      ]
+    }
+  ]
+}

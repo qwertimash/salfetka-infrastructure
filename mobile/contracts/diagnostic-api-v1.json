@@ -1,0 +1,38 @@
+{
+  "activation": {
+    "request": {
+      "code": "64 lowercase hex",
+      "installation_id": "uuid",
+      "activation_id": "uuid",
+      "device_token": "64 lowercase hex, client generated and saved before first request",
+      "platform": "ios|android"
+    },
+    "response": {
+      "tester_id": "uuid",
+      "device_id": "uuid",
+      "participation_id": "uuid"
+    }
+  },
+  "events": {
+    "request": {
+      "events": "1..100 event objects, whole request <=65536 bytes"
+    },
+    "response": {
+      "acknowledged": "committed event UUIDs"
+    }
+  },
+  "problem": {
+    "request": {
+      "event": "kind=problem event"
+    },
+    "response": {
+      "acknowledged": "committed UUIDs"
+    }
+  },
+  "endpoints": {
+    "activate": "POST /v1/activate",
+    "events": "POST /v1/events",
+    "problem": "POST /v1/problems"
+  },
+  "auth": "Authorization: Bearer <device_token>; no client supplied tester/device identity accepted"
+}

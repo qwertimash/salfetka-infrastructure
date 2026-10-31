@@ -1,0 +1,464 @@
+{
+  "schema_version": 1,
+  "kind": "candidate_provenance",
+  "audited_on": "2026-09-29",
+  "status": "COMBINED_CORE_BUILT_LOCAL_NO_DEVICE_ACCEPTANCE",
+  "distribution_status": "BLOCKED_PENDING_COMBINED_LICENSE_AND_BUILD_REVIEW",
+  "full_dependency_graph_audited": false,
+  "source_archive_checksums": {
+    "olcrtc": "f6f7fdba898bfbb507b8dacc914fa68c3b640d18c35ffb1ca9a5239398e6de3f",
+    "openflux": "249ee195269e196165901d432756d800ac3324634052c56758b10e0e12bf3807",
+    "xray-core": "aa2ff911f14bc9a9ca55d5731370fb383bc060c526035dd0f9f72b81442ed9df",
+    "libxray-reference": "4a6549cb1fcfd0ae0e795ec50f9fef4bb83595acb407e64fb45be03be82eee5b",
+    "gvisor": "139b3b908526ec1ba49b378532c0167300ce8136995ab045da0e2259f7bdd0bc"
+  },
+  "notes": [
+    "B2 sources downloaded by pinned archives, metadata and full patched trees verified with fetch-core-sources.py; upstream install scripts were not executed.",
+    "One Go 1.27.1 runtime links Xray, olcRTC and OpenFlux. The Android 0.2.1 core includes the bootstrap DNS TCP patch and passed DE olcRTC JNI and system-TUN smoke on an emulator. Existing iOS device/simulator binaries predate this patch and require rebuilding; physical device/network acceptance remains open.",
+    "libXray is a source reference only and is not linked. Xray uses the direct adapter under mobile/core/adapters/xray.",
+    "Android anet v0.0.5 requires its documented checklinkname=0 flag; the build checks pinned Go/x/net/anet cache layouts before linking. Actual phone interface behavior is unverified.",
+    "License expressions are upstream declarations; full transitive license/source delivery and store distribution review remain open."
+  ],
+  "dependencies": [
+    {
+      "id": "olcrtc",
+      "repository": "https://github.com/ghostlane-project/olcrtc",
+      "default_branch": "proofkit",
+      "commit": "f9edaa7f1ab5b00238eaf72b6dac7540dd344037",
+      "committed_at": "2026-09-29T12:18:45Z",
+      "commit_source": "https://api.github.com/repos/ghostlane-project/olcrtc/commits/f9edaa7f1ab5b00238eaf72b6dac7540dd344037",
+      "module": "github.com/openlibrecommunity/olcrtc",
+      "go_directive": "1.26.3",
+      "license_expression": "Apache-2.0",
+      "license_scope": "fork; original WTFPL text and attribution retained by upstream NOTICE",
+      "build_status": "ANDROID_DNS_PATCH_COMPILED_EMULATOR_LIVE_PASS_IOS_REBUILD_PENDING",
+      "provenance_files": {
+        "go.mod": {
+          "url": "https://raw.githubusercontent.com/ghostlane-project/olcrtc/f9edaa7f1ab5b00238eaf72b6dac7540dd344037/go.mod",
+          "sha256": "bfefe2713b140d94956e7f0d3dd9421e25daba4fa16c8f8246b05a54c5ba6be6"
+        },
+        "go.sum": {
+          "url": "https://raw.githubusercontent.com/ghostlane-project/olcrtc/f9edaa7f1ab5b00238eaf72b6dac7540dd344037/go.sum",
+          "sha256": "6a4a2c273addf1e51d6cf88038c9c72c6b9cfc9b91f150230afe4ea1c4f26287"
+        },
+        "LICENSE": {
+          "url": "https://raw.githubusercontent.com/ghostlane-project/olcrtc/f9edaa7f1ab5b00238eaf72b6dac7540dd344037/LICENSE",
+          "sha256": "542028c2bcc7a523798da062abc3116dca3186d6ddc09a7d6f1febe03041abd3"
+        },
+        "NOTICE": {
+          "url": "https://raw.githubusercontent.com/ghostlane-project/olcrtc/f9edaa7f1ab5b00238eaf72b6dac7540dd344037/NOTICE",
+          "sha256": "045c23836751afbcf7e6090dd316c9c5160b0fced7db74820c78e083bd9ab74f"
+        },
+        "readme.md": {
+          "url": "https://raw.githubusercontent.com/ghostlane-project/olcrtc/f9edaa7f1ab5b00238eaf72b6dac7540dd344037/readme.md",
+          "sha256": "f22a33f73b4e04ef1da5183c5cc2611fd53aac96c453dee4355e3dadb6902e5f"
+        }
+      },
+      "integration_gates": [
+        "Resolve original module path to this exact fork revision, not archived upstream.",
+        "Prove DE server wire compatibility: OLC2 has no old-format fallback; OLVC frame version 5 rejects old frames.",
+        "Measure extension memory and lifecycle on iPhone 17; do not assume one universal iOS memory limit.",
+        "Check full-tunnel direct-routing policy and redaction before enabling upstream logging."
+      ],
+      "source_archive": {
+        "url": "https://codeload.github.com/ghostlane-project/olcrtc/tar.gz/f9edaa7f1ab5b00238eaf72b6dac7540dd344037",
+        "sha256": "f6f7fdba898bfbb507b8dacc914fa68c3b640d18c35ffb1ca9a5239398e6de3f",
+        "prefix": "olcrtc-f9edaa7f1ab5b00238eaf72b6dac7540dd344037",
+        "cache_path": "artifacts/upstream/olcrtc-source.tar.gz",
+        "destination": "artifacts/upstream/olcrtc",
+        "patches": [
+          {
+            "path": "third_party/patches/olcrtc/0001-bootstrap-dns-tcp-fallback.patch",
+            "sha256": "dbf92136a1b440898ecfa3e354c39d0932e02556ca192522a205f4c179e51161",
+            "affected_files": [
+              "internal/protect/resolver.go",
+              "internal/protect/resolver_tcp.go",
+              "internal/protect/salfetka_resolver_tcp_test.go"
+            ]
+          },
+          {
+            "path": "third_party/patches/olcrtc/0002-direct-socket-scope.patch",
+            "sha256": "6d84341122df72a6b1016e79fec6b5786e2638b75d6a513b722574898c2cfa73",
+            "affected_files": [
+              "internal/protect/dial.go",
+              "internal/protect/pionnet.go",
+              "internal/protect/protect.go",
+              "internal/engine/pion.go",
+              "internal/protect/scoped.go",
+              "pkg/olcrtc/client/scoped.go",
+              "internal/protect/salfetka_scoped_test.go"
+            ]
+          }
+        ],
+        "allowed_local_files": {
+          "salfetka-source-receipt.json": "d53c1092d19d398f33e93310553573dc7f4d1fd4afa73ab27d1efde245e8a393"
+        }
+      }
+    },
+    {
+      "id": "openflux",
+      "repository": "https://github.com/p1neappleXpress/OpenFlux",
+      "default_branch": "main",
+      "commit": "2ec01a5bf0404b70854bd4d319a5c67843958351",
+      "committed_at": "2026-09-28T17:56:08Z",
+      "commit_source": "https://api.github.com/repos/p1neappleXpress/OpenFlux/commits/2ec01a5bf0404b70854bd4d319a5c67843958351",
+      "module": "openflux",
+      "go_directive": "1.26.4",
+      "license_expression": "GPL-3.0-or-later",
+      "license_declaration_source": "https://github.com/p1neappleXpress/OpenFlux/blob/2ec01a5bf0404b70854bd4d319a5c67843958351/README.md#license",
+      "build_status": "COMBINED_MACOS_IOS_ANDROID_CORE_COMPILED",
+      "provenance_files": {
+        "go.mod": {
+          "url": "https://raw.githubusercontent.com/p1neappleXpress/OpenFlux/2ec01a5bf0404b70854bd4d319a5c67843958351/go.mod",
+          "sha256": "8800bc5f7c82bb840cb300a22b5915071d7d75763e8175aa4899d3ecd7449ba6"
+        },
+        "go.sum": {
+          "url": "https://raw.githubusercontent.com/p1neappleXpress/OpenFlux/2ec01a5bf0404b70854bd4d319a5c67843958351/go.sum",
+          "sha256": "909cff4aec8589e35d71c774012c1131a975ccd7829b2d4e434ae799118c16d3"
+        },
+        "LICENSE": {
+          "url": "https://raw.githubusercontent.com/p1neappleXpress/OpenFlux/2ec01a5bf0404b70854bd4d319a5c67843958351/LICENSE",
+          "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+        },
+        "NOTICE": {
+          "url": "https://raw.githubusercontent.com/p1neappleXpress/OpenFlux/2ec01a5bf0404b70854bd4d319a5c67843958351/NOTICE",
+          "sha256": "b7c04a24bf8c490c84c375e006fe8f5a723632778a9aa85a6257cfa061806900"
+        }
+      },
+      "integration_gates": [
+        "Resolve noncanonical module name openflux in one common Go build; choose and document adapter/fork packaging in B2.",
+        "Do not link separately built liboflux.a beside another independent Go runtime in the same extension process.",
+        "Verify selected transport encryption, UDP behavior, stop/cancel and real exit with a lab peer.",
+        "Resolve corresponding-source obligations and combined-binary distribution terms before tester delivery."
+      ],
+      "source_archive": {
+        "url": "https://codeload.github.com/p1neappleXpress/OpenFlux/tar.gz/2ec01a5bf0404b70854bd4d319a5c67843958351",
+        "sha256": "249ee195269e196165901d432756d800ac3324634052c56758b10e0e12bf3807",
+        "prefix": "OpenFlux-2ec01a5bf0404b70854bd4d319a5c67843958351",
+        "cache_path": "artifacts/upstream/openflux/source.tar.gz",
+        "destination": "artifacts/upstream/openflux/OpenFlux-2ec01a5bf0404b70854bd4d319a5c67843958351",
+        "patches": [
+          {
+            "path": "third_party/patches/openflux/0001-packet-lifecycle-and-log-capture.patch",
+            "sha256": "e19cb4805eeb3bb2ce0ac7034f6b4c779dcf7792dac217a154bfe9da43641d92",
+            "affected_files": [
+              "mobile/mobile.go",
+              "mobile/salfetka_packet_test.go"
+            ]
+          },
+          {
+            "path": "third_party/patches/openflux/0002-route-carrier-raw-logs.patch",
+            "sha256": "108307dc03bb53a56a9b3d7930a9616ab63f8532e4d09dc3ec44c878638c4b58",
+            "affected_files": [
+              "transport/oneme/max_utils.go",
+              "transport/oneme/max_wclient.go",
+              "transport/oneme/max_call.go",
+              "transport/cupsonline/cupsonline.go"
+            ]
+          },
+          {
+            "path": "third_party/patches/openflux/0003-silence-pion-logger.patch",
+            "sha256": "39860bd264832cd202ac5a7de0a004fc6f33823830868a0e3fbdfe0ead9f41ed",
+            "affected_files": [
+              "transport/oneme/max_call.go"
+            ]
+          },
+          {
+            "path": "third_party/patches/openflux/0004-boards-object-carrier.patch",
+            "sha256": "fd4175350b2f0e5821e8f9297ab1cbb7985d739252a6a7488551f130896185fd",
+            "affected_files": [
+              "transport/yandex/boards.go",
+              "transport/yandex/salfetka_boards_test.go"
+            ]
+          },
+          {
+            "path": "third_party/patches/openflux/0005-direct-socket-scope.patch",
+            "sha256": "eaca36330711c1c19e0183a5e12f2e99e401f95d45f2e1a84c87e7da2e35a7c5",
+            "affected_files": [
+              "netbind/netbind.go",
+              "mobile/mobile.go",
+              "mobile/session.go",
+              "transport/transport.go",
+              "transport/cupsonline/cupsonline.go",
+              "transport/yandex/boards.go",
+              "transport/yandex/yandex.go",
+              "netbind/scoped.go",
+              "netbind/salfetka_scoped_test.go",
+              "mobile/salfetka_scoped_test.go",
+              "transport/yandex/salfetka_scoped_captcha.go",
+              "transport/yandex/salfetka_scoped_captcha_test.go"
+            ]
+          }
+        ],
+        "allowed_local_files": {}
+      }
+    },
+    {
+      "id": "xray-core",
+      "repository": "https://github.com/XTLS/Xray-core",
+      "default_branch": "main",
+      "commit": "e5e85ca9dada936ae736197ad2b7a685972e8e0f",
+      "committed_at": "2026-09-27T23:39:21Z",
+      "commit_source": "https://api.github.com/repos/XTLS/Xray-core/commits/e5e85ca9dada936ae736197ad2b7a685972e8e0f",
+      "module": "github.com/xtls/xray-core",
+      "go_directive": "1.27",
+      "license_expression": "MPL-2.0",
+      "build_status": "COMBINED_MACOS_IOS_ANDROID_CORE_COMPILED",
+      "provenance_files": {
+        "go.mod": {
+          "url": "https://raw.githubusercontent.com/XTLS/Xray-core/e5e85ca9dada936ae736197ad2b7a685972e8e0f/go.mod",
+          "sha256": "1c5bdd1fda5412a33806c1cc7e5373075351a7603237e4274bc1bcab67739572"
+        },
+        "go.sum": {
+          "url": "https://raw.githubusercontent.com/XTLS/Xray-core/e5e85ca9dada936ae736197ad2b7a685972e8e0f/go.sum",
+          "sha256": "a636d6f564c23070b8034ff81451069c6d674ea26ded28e8b2a70be7dd0aa24a"
+        },
+        "LICENSE": {
+          "url": "https://raw.githubusercontent.com/XTLS/Xray-core/e5e85ca9dada936ae736197ad2b7a685972e8e0f/LICENSE",
+          "sha256": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5"
+        },
+        "NOTICE": {
+          "url": "https://raw.githubusercontent.com/XTLS/Xray-core/e5e85ca9dada936ae736197ad2b7a685972e8e0f/NOTICE",
+          "sha256": null,
+          "status": "ROOT_PATH_HTTP_404_NOT_A_TRANSITIVE_LICENSE_AUDIT"
+        }
+      },
+      "integration_gates": [
+        "Select actual Xray-core/bridge pair in B2; independent HEAD is not libXray's declared pin.",
+        "Audit all included MPL files and secondary-license compatibility in a GPL combined work.",
+        "Prove real server profiles and DNS/IPv6 behavior on both devices."
+      ],
+      "source_archive": {
+        "url": "https://codeload.github.com/XTLS/Xray-core/tar.gz/e5e85ca9dada936ae736197ad2b7a685972e8e0f",
+        "sha256": "aa2ff911f14bc9a9ca55d5731370fb383bc060c526035dd0f9f72b81442ed9df",
+        "prefix": "Xray-core-e5e85ca9dada936ae736197ad2b7a685972e8e0f",
+        "cache_path": "artifacts/upstream/xray-core/source.tar.gz",
+        "destination": "artifacts/upstream/xray-core/source",
+        "patches": [
+          {
+            "path": "third_party/patches/xray-core/0001-cnc-preserve-read-half.patch",
+            "sha256": "c65b2f6d17f191b4a4ff4087e3332d9d088d5dfdc53072ffa0d167689c322444",
+            "affected_files": [
+              "common/net/cnc/connection.go",
+              "common/net/cnc/salfetka_halfclose_test.go"
+            ]
+          },
+          {
+            "path": "third_party/patches/xray-core/0002-grpc-stream-close-ownership.patch",
+            "sha256": "17c27aa8e7f3c6c5c2e895a94862980affb52204d51c178450ff8771539cbb83",
+            "affected_files": [
+              "transport/internet/grpc/dial.go",
+              "transport/internet/grpc/encoding/hunkconn.go",
+              "transport/internet/grpc/encoding/multiconn.go"
+            ]
+          },
+          {
+            "path": "third_party/patches/xray-core/0003-observatory-immutable-snapshots.patch",
+            "sha256": "e046444753dd1465254cbafbd80424eb8c73ebcdd2289fc5f0c142a2fc5265c0",
+            "affected_files": [
+              "app/observatory/observer.go",
+              "app/observatory/salfetka_snapshot_test.go"
+            ]
+          },
+          {
+            "path": "third_party/patches/xray-core/0004-owned-outbound-dialer-cleanup.patch",
+            "sha256": "4ae5ac3048bd896c00f6bfe5a1ae16c38e9176ad24386d5ac7d8ed4a884e231b",
+            "affected_files": [
+              "app/proxyman/outbound/handler.go",
+              "transport/internet/memory_settings.go",
+              "transport/internet/salfetka_dialer_cleanup.go",
+              "transport/internet/salfetka_dialer_cleanup_test.go",
+              "transport/internet/grpc/dial.go",
+              "transport/internet/grpc/salfetka_cache_cleanup_test.go",
+              "transport/internet/splithttp/dialer.go",
+              "transport/internet/splithttp/client.go",
+              "transport/internet/splithttp/mux.go",
+              "transport/internet/splithttp/salfetka_owned_client.go",
+              "transport/internet/splithttp/salfetka_cache_cleanup_test.go",
+              "transport/internet/hysteria/dialer.go"
+            ]
+          },
+          {
+            "path": "third_party/patches/xray-core/0005-instance-owned-system-dns.patch",
+            "sha256": "ea19bf0ee696ea72ef19ddca17ac3a3ad0f827582a3cffaf1676fa6df5235d52",
+            "affected_files": [
+              "transport/internet/dialer.go",
+              "core/context.go",
+              "proxy/freedom/freedom.go",
+              "app/proxyman/outbound/handler.go",
+              "transport/internet/grpc/dial.go",
+              "transport/internet/salfetka_system_context.go",
+              "transport/internet/salfetka_system_context_test.go"
+            ]
+          },
+          {
+            "path": "third_party/patches/xray-core/0006-instance-owned-physical-network.patch",
+            "sha256": "1ea9da0ea737427e0fa69f7a23a924fb24b7a7dc4173bf55b708e594124edc21",
+            "affected_files": [
+              "app/dns/dns.go",
+              "app/dns/nameserver.go",
+              "app/dns/nameserver_local.go",
+              "app/dns/nameserver_quic.go",
+              "core/context.go",
+              "core/xray.go",
+              "features/dns/localdns/client.go",
+              "proxy/freedom/freedom.go",
+              "transport/internet/dialer.go",
+              "transport/internet/salfetka_system_context.go",
+              "transport/internet/system_dialer.go",
+              "transport/internet/salfetka_network_context.go",
+              "transport/internet/salfetka_network_context_test.go"
+            ]
+          },
+          {
+            "path": "third_party/patches/xray-core/0007-instance-owned-dns-cleanup.patch",
+            "sha256": "09e38f71e01c60c7f7501bad7c0a3e327f004b0c961a1f9f21fb7030816bd672",
+            "affected_files": [
+              "app/dns/cache_controller.go",
+              "app/dns/dns.go",
+              "app/dns/dnscommon.go",
+              "app/dns/nameserver_cached.go",
+              "app/dns/nameserver_doh.go",
+              "app/dns/nameserver_quic.go",
+              "app/dns/nameserver_tcp.go",
+              "app/dns/nameserver_udp.go",
+              "app/dns/salfetka_owned_context.go",
+              "app/dns/salfetka_owned_transports.go",
+              "app/dns/salfetka_owned_cleanup_test.go",
+              "app/dns/salfetka_owned_context_test.go"
+            ]
+          },
+          {
+            "path": "third_party/patches/xray-core/0008-owned-observatory-probes.patch",
+            "sha256": "5617cc72867e87e77a0380ff6d7163edf3050a47e8404e21585345766aa61a96",
+            "affected_files": [
+              "app/observatory/observer.go",
+              "app/observatory/salfetka_probe_lifecycle_test.go"
+            ]
+          },
+          {
+            "path": "third_party/patches/xray-core/0009-hysteria-cleaner-owner-isolation.patch",
+            "sha256": "caa24fe5a7f71f5f94a4457bdc254ceef42cb0344f27f0774fa2f048cf81e535",
+            "affected_files": [
+              "transport/internet/hysteria/dialer.go",
+              "transport/internet/hysteria/salfetka_cleanup_test.go"
+            ]
+          },
+          {
+            "path": "third_party/patches/xray-core/0010-scoped-dns-address-families.patch",
+            "sha256": "db23b0996dcec4e3926efc1e2df8c1dca13207eef3b4dcd976e3d8708099ca67",
+            "affected_files": [
+              "features/dns/localdns/client.go",
+              "features/dns/localdns/salfetka_scoped_family_test.go"
+            ]
+          }
+        ],
+        "allowed_local_files": {}
+      }
+    },
+    {
+      "id": "libxray-reference",
+      "repository": "https://github.com/XTLS/libXray",
+      "default_branch": "main",
+      "commit": "83f16029d38791274c40fa061958daf9ccd85bb7",
+      "committed_at": "2026-09-26T02:32:48Z",
+      "commit_source": "https://api.github.com/repos/XTLS/libXray/commits/83f16029d38791274c40fa061958daf9ccd85bb7",
+      "module": "github.com/xtls/libxray",
+      "go_directive": "1.27.1",
+      "license_expression": "MIT",
+      "build_status": "NOT_BUILT_REFERENCE_ONLY",
+      "declared_xray_core_module_version": "v1.260327.1-0.20260908222543-52a412d9e2f5",
+      "provenance_files": {
+        "go.mod": {
+          "url": "https://raw.githubusercontent.com/XTLS/libXray/83f16029d38791274c40fa061958daf9ccd85bb7/go.mod",
+          "sha256": "33417e6ff81e4d831bca12e026d6f7453567826c438651e0502d54ea3353681a"
+        },
+        "go.sum": {
+          "url": "https://raw.githubusercontent.com/XTLS/libXray/83f16029d38791274c40fa061958daf9ccd85bb7/go.sum",
+          "sha256": "f3476033c78087dee59f9e32fe0f8a811a07c8eca7f51669fcfd6bd5177a850f"
+        },
+        "LICENSE": {
+          "url": "https://raw.githubusercontent.com/XTLS/libXray/83f16029d38791274c40fa061958daf9ccd85bb7/LICENSE",
+          "sha256": "992cf88a505936a11bd0fff17b7842abd9411e8da41fd69f22f47ae915e9d198"
+        },
+        "NOTICE": {
+          "url": "https://raw.githubusercontent.com/XTLS/libXray/83f16029d38791274c40fa061958daf9ccd85bb7/NOTICE",
+          "sha256": null,
+          "status": "ROOT_PATH_HTTP_404_NOT_A_TRANSITIVE_LICENSE_AUDIT"
+        },
+        "README.md": {
+          "url": "https://raw.githubusercontent.com/XTLS/libXray/83f16029d38791274c40fa061958daf9ccd85bb7/README.md",
+          "sha256": "04003983cfaac66f2540858a91f28abe15a2c63728255dad5ae15f3c19344541"
+        }
+      },
+      "integration_gates": [
+        "One Go runtime per process: build all needed Go packages together, not by merging independently built archives/frameworks.",
+        "API stability is not guaranteed by upstream; wrapper acceptance requires exact revision tests.",
+        "Pin gomobile/gobind; upstream scripts resolve latest unless explicitly configured."
+      ],
+      "source_archive": {
+        "url": "https://codeload.github.com/XTLS/libXray/tar.gz/83f16029d38791274c40fa061958daf9ccd85bb7",
+        "sha256": "4a6549cb1fcfd0ae0e795ec50f9fef4bb83595acb407e64fb45be03be82eee5b",
+        "prefix": "libXray-83f16029d38791274c40fa061958daf9ccd85bb7",
+        "cache_path": "artifacts/upstream/libxray-reference/source.tar.gz",
+        "destination": "artifacts/upstream/libxray-reference/source",
+        "patches": [],
+        "allowed_local_files": {}
+      }
+    },
+    {
+      "id": "gvisor",
+      "repository": "https://github.com/google/gvisor",
+      "commit": "23ef90c42be712c5015852c325e5235282396539",
+      "committed_at": "2026-05-30T04:11:28Z",
+      "commit_source": "https://github.com/google/gvisor/commit/23ef90c42be712c5015852c325e5235282396539",
+      "module": "gvisor.dev/gvisor",
+      "module_version": "v0.0.0-20260530041128-23ef90c42be7",
+      "go_directive": "1.26.3",
+      "license_expression": "Apache-2.0",
+      "build_status": "LOCAL_ARM64_RACE_CAS_REGRESSION_FIXED",
+      "provenance_files": {
+        "go.mod": {
+          "url": "https://raw.githubusercontent.com/google/gvisor/23ef90c42be712c5015852c325e5235282396539/go.mod",
+          "sha256": "2003903d9f23d5bcc09493b6e3178f3224fbdad74ba12e3adf3699637285120c"
+        },
+        "go.sum": {
+          "url": "https://raw.githubusercontent.com/google/gvisor/23ef90c42be712c5015852c325e5235282396539/go.sum",
+          "sha256": "5d3c42a2456135454d8db74aeed5f20f2ef3f6f7cc5a5d652c07a6c871fb3ba4"
+        },
+        "LICENSE": {
+          "url": "https://raw.githubusercontent.com/google/gvisor/23ef90c42be712c5015852c325e5235282396539/LICENSE",
+          "sha256": "0fbab5c58efbdf6d31e8085214f2dd821659c03d73cff3ed2b08e98826ea1cd9"
+        },
+        "NOTICE": {
+          "url": "https://raw.githubusercontent.com/google/gvisor/23ef90c42be712c5015852c325e5235282396539/NOTICE",
+          "sha256": null
+        }
+      },
+      "integration_gates": [
+        "The patch changes only race && arm64 assembly; ordinary iOS builds retain the non-race implementation.",
+        "Regression must reject stale expected values and preserve the complete uintptr replacement.",
+        "Keep CLI and network deadlines unchanged; run the entire lab-smoke and packet race packages."
+      ],
+      "source_archive": {
+        "url": "https://codeload.github.com/google/gvisor/tar.gz/23ef90c42be712c5015852c325e5235282396539",
+        "sha256": "139b3b908526ec1ba49b378532c0167300ce8136995ab045da0e2259f7bdd0bc",
+        "prefix": "gvisor-23ef90c42be712c5015852c325e5235282396539",
+        "cache_path": "artifacts/upstream/gvisor/source.tar.gz",
+        "destination": "artifacts/upstream/gvisor/source",
+        "patches": [
+          {
+            "path": "third_party/patches/gvisor/0001-race-arm64-cas-register.patch",
+            "sha256": "b616acfdbaa718038f00ed17304b845af75a2e0e2bd133322f733355acdb42f1",
+            "affected_files": [
+              "pkg/sync/race_arm64.s"
+            ]
+          }
+        ],
+        "allowed_local_files": {}
+      }
+    }
+  ],
+  "source_audit_updated_on": "2026-09-29",
+  "build_status_scope": "Local common-core compilation only; not individual engine live acceptance, signed apps, or tester distribution."
+}

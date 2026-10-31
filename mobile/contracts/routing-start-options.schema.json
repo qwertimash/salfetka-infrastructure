@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://salfetka.invalid/schemas/routing-start-options-v1",
+  "title": "Trusted host routing startup options",
+  "description": "Separate sf_start_routed argument, never a subscription field. Physical interface identity and one local preference snapshot are owned by the host. Missing preferences means empty tunnel-only local preferences; source authority still wins.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "version", "subscription_id", "interface_name"],
+  "properties": {
+    "format": {"const": "salfetka.routing_start"},
+    "version": {"const": 1},
+    "subscription_id": {"type": "string", "format": "uuid"},
+    "interface_name": {"type": "string", "pattern": "^(en[0-9]{1,4}|pdp_ip[0-9]{1,4})$"},
+    "preferences": {"$ref": "routing-preferences.schema.json"}
+  }
+}

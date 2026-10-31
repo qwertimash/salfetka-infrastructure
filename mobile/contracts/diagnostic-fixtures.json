@@ -1,0 +1,187 @@
+[
+  {
+    "name": "unknown_is_null_and_measured_zero_is_zero",
+    "valid": true,
+    "event": {
+      "schema_version": 1,
+      "event_id": "00000000-0000-4000-8000-000000000001",
+      "process": "extension",
+      "process_run_id": "00000000-0000-4000-8000-000000000002",
+      "sequence": 1,
+      "occurred_at_ms": 1791352800000,
+      "monotonic_ms": 120,
+      "platform": "ios",
+      "app_version": "0.2.10",
+      "build_number": 12,
+      "core_version": null,
+      "os_version": "26.6.2",
+      "kind": "heartbeat",
+      "session_id": "00000000-0000-4000-8000-000000000003",
+      "payload": {
+        "state": "connected",
+        "network": "unknown",
+        "memory_rss_bytes": null,
+        "bytes_in": 0
+      }
+    }
+  },
+  {
+    "name": "raw_config",
+    "valid": false,
+    "event": {
+      "schema_version": 1,
+      "event_id": "00000000-0000-4000-8000-000000000001",
+      "process": "extension",
+      "process_run_id": "00000000-0000-4000-8000-000000000002",
+      "sequence": 1,
+      "occurred_at_ms": 1791352800000,
+      "monotonic_ms": 120,
+      "platform": "ios",
+      "app_version": "0.2.10",
+      "build_number": 12,
+      "core_version": null,
+      "os_version": "26.6.2",
+      "kind": "heartbeat",
+      "session_id": "00000000-0000-4000-8000-000000000003",
+      "payload": {
+        "state": "connected",
+        "network": "unknown",
+        "memory_rss_bytes": null,
+        "bytes_in": 0,
+        "config": "secret"
+      }
+    }
+  },
+  {
+    "name": "foreign_identity",
+    "valid": false,
+    "event": {
+      "schema_version": 1,
+      "event_id": "00000000-0000-4000-8000-000000000001",
+      "process": "extension",
+      "process_run_id": "00000000-0000-4000-8000-000000000002",
+      "sequence": 1,
+      "occurred_at_ms": 1791352800000,
+      "monotonic_ms": 120,
+      "platform": "ios",
+      "app_version": "0.2.10",
+      "build_number": 12,
+      "core_version": null,
+      "os_version": "26.6.2",
+      "kind": "heartbeat",
+      "session_id": "00000000-0000-4000-8000-000000000003",
+      "payload": {
+        "state": "connected",
+        "network": "unknown",
+        "memory_rss_bytes": null,
+        "bytes_in": 0
+      },
+      "tester_id": "foreign"
+    }
+  },
+  {
+    "name": "ssid",
+    "valid": false,
+    "event": {
+      "schema_version": 1,
+      "event_id": "00000000-0000-4000-8000-000000000001",
+      "process": "extension",
+      "process_run_id": "00000000-0000-4000-8000-000000000002",
+      "sequence": 1,
+      "occurred_at_ms": 1791352800000,
+      "monotonic_ms": 120,
+      "platform": "ios",
+      "app_version": "0.2.10",
+      "build_number": 12,
+      "core_version": null,
+      "os_version": "26.6.2",
+      "kind": "heartbeat",
+      "session_id": "00000000-0000-4000-8000-000000000003",
+      "payload": {
+        "state": "connected",
+        "network": "unknown",
+        "memory_rss_bytes": null,
+        "bytes_in": 0,
+        "ssid": "private"
+      }
+    }
+  },
+  {
+    "name": "invalid_enum",
+    "valid": false,
+    "event": {
+      "schema_version": 1,
+      "event_id": "00000000-0000-4000-8000-000000000001",
+      "process": "extension",
+      "process_run_id": "00000000-0000-4000-8000-000000000002",
+      "sequence": 1,
+      "occurred_at_ms": 1791352800000,
+      "monotonic_ms": 120,
+      "platform": "ios",
+      "app_version": "0.2.10",
+      "build_number": 12,
+      "core_version": null,
+      "os_version": "26.6.2",
+      "kind": "heartbeat",
+      "session_id": "00000000-0000-4000-8000-000000000003",
+      "payload": {
+        "state": "connected",
+        "network": "home",
+        "memory_rss_bytes": null,
+        "bytes_in": 0
+      }
+    }
+  },
+  {
+    "name": "negative_memory",
+    "valid": false,
+    "event": {
+      "schema_version": 1,
+      "event_id": "00000000-0000-4000-8000-000000000001",
+      "process": "extension",
+      "process_run_id": "00000000-0000-4000-8000-000000000002",
+      "sequence": 1,
+      "occurred_at_ms": 1791352800000,
+      "monotonic_ms": 120,
+      "platform": "ios",
+      "app_version": "0.2.10",
+      "build_number": 12,
+      "core_version": null,
+      "os_version": "26.6.2",
+      "kind": "heartbeat",
+      "session_id": "00000000-0000-4000-8000-000000000003",
+      "payload": {
+        "state": "connected",
+        "network": "unknown",
+        "memory_rss_bytes": -1,
+        "bytes_in": 0
+      }
+    }
+  },
+  {
+    "name": "bool_counter",
+    "valid": false,
+    "event": {
+      "schema_version": 1,
+      "event_id": "00000000-0000-4000-8000-000000000001",
+      "process": "extension",
+      "process_run_id": "00000000-0000-4000-8000-000000000002",
+      "sequence": 1,
+      "occurred_at_ms": 1791352800000,
+      "monotonic_ms": 120,
+      "platform": "ios",
+      "app_version": "0.2.10",
+      "build_number": 12,
+      "core_version": null,
+      "os_version": "26.6.2",
+      "kind": "heartbeat",
+      "session_id": "00000000-0000-4000-8000-000000000003",
+      "payload": {
+        "state": "connected",
+        "network": "unknown",
+        "memory_rss_bytes": null,
+        "bytes_in": true
+      }
+    }
+  }
+]

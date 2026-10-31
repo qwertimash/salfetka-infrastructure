@@ -1,0 +1,233 @@
+diff --git a/transport/internet/hysteria/dialer.go b/transport/internet/hysteria/dialer.go
+--- a/transport/internet/hysteria/dialer.go
++++ b/transport/internet/hysteria/dialer.go
+@@ -282,12 +282,37 @@
+ func (m *clientManager) clean() {
+ 	ticker := time.NewTicker(idleCleanupInterval)
+ 	for range ticker.C {
+-		m.RLock()
+-		for _, c := range m.m {
+-			c.clean()
+-		}
+-		m.RUnlock()
+-	}
++		m.cleanOnce()
++	}
++}
++
++func (m *clientManager) cleanOnce() {
++	// A client's mutex may be held by a network handshake. Only snapshot map
++	// membership here; waiting for that client must not block another owner's
++	// registration or cleanup. The client mutex protects each retained pointer.
++	m.RLock()
++	clients := make([]*client, 0, len(m.m))
++	for _, c := range m.m {
++		clients = append(clients, c)
++	}
++	m.RUnlock()
++	for _, c := range clients {
++		c.clean()
++	}
++}
++
++func (m *clientManager) closeClient(key dialerConf, owned *client) {
++	m.Lock()
++	if m.m[key] == owned {
++		delete(m.m, key)
++	}
++	m.Unlock()
++	owned.Lock()
++	owned.closed = true
++	if owned.conn != nil {
++		owned.close()
++	}
++	owned.Unlock()
+ }
+ 
+ var (
+@@ -338,17 +363,7 @@
+ 			owned := c
+ 			key := dialerConf{dest, streamSettings}
+ 			if !streamSettings.AddDialerCleanup(func() {
+-				manager.Lock()
+-				if manager.m[key] == owned {
+-					delete(manager.m, key)
+-				}
+-				manager.Unlock()
+-				owned.Lock()
+-				owned.closed = true
+-				if owned.conn != nil {
+-					owned.close()
+-				}
+-				owned.Unlock()
++				manager.closeClient(key, owned)
+ 			}) {
+ 				manager.Unlock()
+ 				return nil, io.ErrClosedPipe
+diff --git a/transport/internet/hysteria/salfetka_cleanup_test.go b/transport/internet/hysteria/salfetka_cleanup_test.go
+new file mode 100644
+--- /dev/null
++++ b/transport/internet/hysteria/salfetka_cleanup_test.go
+@@ -0,0 +1,162 @@
++package hysteria
++
++import (
++	"context"
++	"crypto/tls"
++	"net"
++	"runtime"
++	"strings"
++	"sync"
++	"testing"
++	"time"
++
++	xnet "github.com/xtls/xray-core/common/net"
++	"github.com/xtls/xray-core/transport/internet"
++)
++
++func waitHysteriaCleanup(t *testing.T, done <-chan struct{}, label string) {
++	t.Helper()
++	select {
++	case <-done:
++	case <-time.After(time.Second):
++		t.Fatal(label, "blocked by another owner")
++	}
++}
++
++// Wait for the actual cleaner to enter client.clean, where the real blackhole
++// handshake holds the mutex. No sleep or periodic-ticker ordering is assumed.
++func waitHysteriaCleanerBlocked(t *testing.T) {
++	t.Helper()
++	deadline := time.Now().Add(time.Second)
++	for time.Now().Before(deadline) {
++		n, _ := runtime.GoroutineProfile(nil)
++		stacks := make([]runtime.StackRecord, n+32)
++		if n, ok := runtime.GoroutineProfile(stacks); ok {
++			for _, stack := range stacks[:n] {
++				frames := runtime.CallersFrames(stack.Stack())
++				clientWait, managerWait := false, false
++				for {
++					frame, more := frames.Next()
++					clientWait = clientWait || strings.HasSuffix(frame.Function, "/hysteria.(*client).clean")
++					managerWait = managerWait || strings.HasSuffix(frame.Function, "/hysteria.(*clientManager).cleanOnce")
++					if !more {
++						break
++					}
++				}
++				if clientWait && managerWait {
++					return
++				}
++			}
++		}
++		runtime.Gosched()
++	}
++	t.Fatal("cleaner did not reach the active handshake mutex")
++}
++
++func TestSalfetkaHysteriaCleanerDoesNotBlockOtherOwners(t *testing.T) {
++	sink, err := net.ListenPacket("udp4", "127.0.0.1:0")
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer sink.Close()
++	packet := make(chan struct{})
++	go func() {
++		_, _, err := sink.ReadFrom(make([]byte, 2048))
++		if err == nil {
++			close(packet)
++		}
++	}()
++	destination := xnet.UDPDestination(xnet.IPAddress(net.IPv4(127, 0, 0, 1)), xnet.Port(sink.LocalAddr().(*net.UDPAddr).Port))
++	blocked := &client{dest: destination, config: &Config{Auth: "synthetic-cleanup-only"}, tlsConfig: &tls.Config{ServerName: "synthetic.invalid", NextProtos: []string{"h3"}}}
++	ctx, cancel := context.WithCancel(context.Background())
++	dialDone := make(chan struct{})
++	go func() {
++		defer close(dialDone)
++		conn, _ := blocked.tcp(ctx)
++		if conn != nil {
++			conn.Close()
++		}
++	}()
++	defer func() { cancel(); waitHysteriaCleanup(t, dialDone, "synthetic handshake cancellation") }()
++	waitHysteriaCleanup(t, packet, "synthetic UDP handshake")
++
++	settingsA, settingsB := &internet.MemoryStreamConfig{}, &internet.MemoryStreamConfig{}
++	keyA, keyB := dialerConf{destination, settingsA}, dialerConf{destination, settingsB}
++	other := &client{}
++	m := &clientManager{m: map[dialerConf]*client{keyA: blocked, keyB: other}}
++	if !settingsB.AddDialerCleanup(func() { m.closeClient(keyB, other) }) {
++		t.Fatal("cleanup registration")
++	}
++	cleanDone := make(chan struct{})
++	go func() { m.cleanOnce(); close(cleanDone) }()
++	defer func() { cancel(); waitHysteriaCleanup(t, cleanDone, "cleaner completion") }()
++	waitHysteriaCleanerBlocked(t)
++
++	closed := make(chan struct{})
++	go func() { settingsB.CloseDialerCaches(); close(closed) }()
++	waitHysteriaCleanup(t, closed, "unrelated owner cleanup")
++	inserted := make(chan struct{})
++	keyC := dialerConf{destination, &internet.MemoryStreamConfig{}}
++	third := &client{}
++	go func() { m.Lock(); m.m[keyC] = third; m.Unlock(); close(inserted) }()
++	waitHysteriaCleanup(t, inserted, "unrelated owner registration")
++	m.RLock()
++	correct := m.m[keyA] == blocked && m.m[keyB] == nil && m.m[keyC] == third
++	m.RUnlock()
++	if !correct || !other.closed {
++		t.Fatal("cleanup changed another owner's membership")
++	}
++	select {
++	case <-dialDone:
++		t.Fatal("cleanup canceled another owner's handshake")
++	default:
++	}
++	cancel()
++	waitHysteriaCleanup(t, dialDone, "owner handshake cancellation")
++	waitHysteriaCleanup(t, cleanDone, "cleaner completion")
++	blocked.Lock()
++	wasClosed := blocked.closed
++	blocked.Unlock()
++	if wasClosed {
++		t.Fatal("cleaner closed an active owner")
++	}
++	settingsB.CloseDialerCaches()
++	m.closeClient(keyA, blocked)
++	m.closeClient(keyC, third)
++}
++
++func TestSalfetkaHysteriaCleanupPreservesReplacement(t *testing.T) {
++	key := dialerConf{MemoryStreamConfig: &internet.MemoryStreamConfig{}}
++	old, replacement := &client{}, &client{}
++	m := &clientManager{m: map[dialerConf]*client{key: replacement}}
++	m.closeClient(key, old)
++	m.closeClient(key, old)
++	if m.m[key] != replacement || replacement.closed || !old.closed {
++		t.Fatal("late cleanup removed or closed replacement owner")
++	}
++	m.cleanOnce()
++	if m.m[key] != replacement || replacement.closed {
++		t.Fatal("cleaner changed replacement ownership")
++	}
++}
++
++func TestSalfetkaHysteriaConcurrentCleanupAndRegistration(t *testing.T) {
++	m := &clientManager{m: make(map[dialerConf]*client)}
++	var work sync.WaitGroup
++	for range 32 {
++		work.Go(func() {
++			key := dialerConf{MemoryStreamConfig: &internet.MemoryStreamConfig{}}
++			owned := &client{}
++			m.Lock()
++			m.m[key] = owned
++			m.Unlock()
++			m.cleanOnce()
++			m.closeClient(key, owned)
++			m.closeClient(key, owned)
++		})
++	}
++	work.Wait()
++	if len(m.m) != 0 {
++		t.Fatal("closed owners remained in registry")
++	}
++}

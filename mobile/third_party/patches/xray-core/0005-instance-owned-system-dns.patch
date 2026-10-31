@@ -1,0 +1,229 @@
+diff --git a/transport/internet/dialer.go b/transport/internet/dialer.go
+--- a/transport/internet/dialer.go
++++ b/transport/internet/dialer.go
+@@ -4,6 +4,7 @@
+ 	"context"
+ 	"fmt"
+ 	"strings"
++	"sync"
+ 
+ 	"github.com/xtls/xray-core/common"
+ 	"github.com/xtls/xray-core/common/dice"
+@@ -80,11 +81,16 @@
+ }
+ 
+ var (
+-	dnsClient dns.Client
+-	obm       outbound.Manager
++	systemDialerAccess sync.RWMutex
++	dnsClient          dns.Client
++	obm                outbound.Manager
+ )
+ 
+ func LookupForIP(domain string, strategy DomainStrategy, localAddr net.Address) ([]net.IP, error) {
++	return LookupForIPContext(context.Background(), domain, strategy, localAddr)
++}
++func LookupForIPContext(ctx context.Context, domain string, strategy DomainStrategy, localAddr net.Address) ([]net.IP, error) {
++	dnsClient, _ := systemDialerFeatures(ctx)
+ 	if dnsClient == nil {
+ 		return nil, errors.New("DNS client not initialized")
+ 	}
+@@ -253,7 +259,7 @@
+ 		if outboundName == "freedom" && dest.Network == net.Network_UDP && origTargetAddr != nil && src == nil {
+ 			finalStrategy = finalStrategy.GetDynamicStrategy(origTargetAddr.Family())
+ 		}
+-		ips, err := LookupForIP(dest.Address.Domain(), finalStrategy, src)
++		ips, err := LookupForIPContext(ctx, dest.Address.Domain(), finalStrategy, src)
+ 		if err != nil {
+ 			errors.LogErrorInner(ctx, err, "failed to resolve ip")
+ 			if sockopt.DomainStrategy.ForceIP() {
+@@ -268,6 +274,7 @@
+ 	}
+ 
+ 	if len(sockopt.DialerProxy) > 0 {
++		_, obm := systemDialerFeatures(ctx)
+ 		if obm == nil {
+ 			return nil, errors.New("there is no outbound manager for dialerProxy")
+ 		}
+@@ -282,6 +289,8 @@
+ }
+ 
+ func InitSystemDialer(dc dns.Client, om outbound.Manager) {
++	systemDialerAccess.Lock()
++	defer systemDialerAccess.Unlock()
+ 	dnsClient = dc
+ 	obm = om
+ }
+diff --git a/core/context.go b/core/context.go
+--- a/core/context.go
++++ b/core/context.go
+@@ -2,6 +2,9 @@
+ 
+ import (
+ 	"context"
++	"github.com/xtls/xray-core/features/dns"
++	"github.com/xtls/xray-core/features/outbound"
++	"github.com/xtls/xray-core/transport/internet"
+ )
+ 
+ // XrayKey is the key type of Instance in Context, exported for test.
+@@ -40,6 +43,13 @@
+ 	if FromContext(ctx) != v {
+ 		ctx = context.WithValue(ctx, xrayKey, v)
+ 	}
++	if v != nil {
++		ctx = internet.ContextWithSystemDialerProvider(ctx, func() (dns.Client, outbound.Manager) {
++			dc, _ := v.GetFeature(dns.ClientType()).(dns.Client)
++			om, _ := v.GetFeature(outbound.ManagerType()).(outbound.Manager)
++			return dc, om
++		})
++	}
+ 	return ctx
+ }
+ 
+diff --git a/proxy/freedom/freedom.go b/proxy/freedom/freedom.go
+--- a/proxy/freedom/freedom.go
++++ b/proxy/freedom/freedom.go
+@@ -53,6 +53,7 @@
+ func init() {
+ 	common.Must(common.RegisterConfig((*Config)(nil), func(ctx context.Context, config interface{}) (interface{}, error) {
+ 		h := new(Handler)
++		h.systemContext = ctx
+ 		if streamSettings, ok := session.StreamSettingsFromContext(ctx).(*internet.MemoryStreamConfig); ok && streamSettings.SocketSettings != nil {
+ 			h.resolveStrategy = streamSettings.SocketSettings.DomainStrategy
+ 			h.usesDialerProxy = len(streamSettings.SocketSettings.DialerProxy) > 0
+@@ -94,6 +95,7 @@
+ // Handler handles Freedom connections.
+ type Handler struct {
+ 	policyManager   policy.Manager
++	systemContext   context.Context
+ 	config          *Config
+ 	finalRules      []*FinalRule
+ 	resolveStrategy internet.DomainStrategy
+@@ -294,7 +296,7 @@
+ 		if destination.Address.Family().IsDomain() {
+ 			if defaultRule != nil || len(h.finalRules) > 0 {
+ 				if strategy := h.resolveStrategy; strategy.HasStrategy() {
+-					ips, err := internet.LookupForIP(destination.Address.Domain(), strategy, outGateway)
++					ips, err := internet.LookupForIPContext(ctx, destination.Address.Domain(), strategy, outGateway)
+ 					if err != nil { // non-force may still dial with system DNS
+ 						errors.LogInfoInner(ctx, err, "failed to get IP address for domain ", destination.Address.Domain())
+ 						if strategy.ForceIP() {
+@@ -599,7 +601,7 @@
+ 				} else {
+ 					shouldUseSystemResolver := true
+ 					if strategy := w.Handler.resolveStrategy; strategy.HasStrategy() {
+-						ips, err := internet.LookupForIP(b.UDP.Address.Domain(), strategy, w.OutGateway)
++						ips, err := internet.LookupForIPContext(w.Handler.systemContext, b.UDP.Address.Domain(), strategy, w.OutGateway)
+ 						if err != nil {
+ 							// drop packet if resolve failed when forceIP
+ 							if strategy.ForceIP() {
+diff --git a/app/proxyman/outbound/handler.go b/app/proxyman/outbound/handler.go
+--- a/app/proxyman/outbound/handler.go
++++ b/app/proxyman/outbound/handler.go
+@@ -184,7 +184,7 @@
+ 		if ob.Target.Network == net.Network_UDP && ob.OriginalTarget.Address != nil {
+ 			strategy = strategy.GetDynamicStrategy(ob.OriginalTarget.Address.Family())
+ 		}
+-		ips, err := internet.LookupForIP(ob.Target.Address.Domain(), strategy, nil)
++		ips, err := internet.LookupForIPContext(ctx, ob.Target.Address.Domain(), strategy, nil)
+ 		if err != nil {
+ 			errors.LogInfoInner(ctx, err, "failed to resolve ip for target ", ob.Target.Address.Domain())
+ 			if h.senderSettings.TargetStrategy.ForceIP() {
+diff --git a/transport/internet/grpc/dial.go b/transport/internet/grpc/dial.go
+--- a/transport/internet/grpc/dial.go
++++ b/transport/internet/grpc/dial.go
+@@ -127,6 +127,7 @@
+ 			}
+ 			address := net.ParseAddress(rawHost)
+ 
++			gctx = internet.InheritSystemDialerContext(gctx, ctx)
+ 			gctx = c.ContextWithID(gctx, c.IDFromContext(ctx))
+ 			gctx = session.ContextWithOutbounds(gctx, session.OutboundsFromContext(ctx))
+ 			gctx = session.ContextWithTimeoutOnly(gctx, true)
+diff --git a/transport/internet/salfetka_system_context.go b/transport/internet/salfetka_system_context.go
+new file mode 100644
+--- /dev/null
++++ b/transport/internet/salfetka_system_context.go
+@@ -0,0 +1,30 @@
++package internet
++
++import (
++	"context"
++	"github.com/xtls/xray-core/features/dns"
++	"github.com/xtls/xray-core/features/outbound"
++)
++
++type systemDialerKey struct{}
++type SystemDialerProvider func() (dns.Client, outbound.Manager)
++
++// The provider is attached by core.toContext and resolves this instance's own
++// features, including contexts created before all features were constructed.
++func ContextWithSystemDialerProvider(ctx context.Context, provider SystemDialerProvider) context.Context {
++	return context.WithValue(ctx, systemDialerKey{}, provider)
++}
++func systemDialerFeatures(ctx context.Context) (dns.Client, outbound.Manager) {
++	if provider, ok := ctx.Value(systemDialerKey{}).(SystemDialerProvider); ok {
++		return provider()
++	}
++	systemDialerAccess.RLock()
++	defer systemDialerAccess.RUnlock()
++	return dnsClient, obm
++}
++func InheritSystemDialerContext(destination, source context.Context) context.Context {
++	if provider, ok := source.Value(systemDialerKey{}).(SystemDialerProvider); ok {
++		destination = ContextWithSystemDialerProvider(destination, provider)
++	}
++	return destination
++}
+diff --git a/transport/internet/salfetka_system_context_test.go b/transport/internet/salfetka_system_context_test.go
+new file mode 100644
+--- /dev/null
++++ b/transport/internet/salfetka_system_context_test.go
+@@ -0,0 +1,46 @@
++package internet
++
++import (
++	"context"
++	"github.com/xtls/xray-core/common/net"
++	"github.com/xtls/xray-core/features/dns"
++	"github.com/xtls/xray-core/features/outbound"
++	"sync"
++	"testing"
++)
++
++type scopedDNS struct{ ip net.IP }
++
++func (*scopedDNS) Type() interface{} { return dns.ClientType() }
++func (*scopedDNS) Start() error      { return nil }
++func (*scopedDNS) Close() error      { return nil }
++func (d *scopedDNS) LookupIP(string, dns.IPOption) ([]net.IP, uint32, error) {
++	return []net.IP{d.ip}, 1, nil
++}
++func TestSalfetkaSystemDNSIsInstanceOwnedUnderParallelInit(t *testing.T) {
++	dc, om := systemDialerFeatures(context.Background())
++	t.Cleanup(func() { InitSystemDialer(dc, om) })
++	first := &scopedDNS{net.ParseIP("192.0.2.1")}
++	second := &scopedDNS{net.ParseIP("192.0.2.2")}
++	contexts := []context.Context{ContextWithSystemDialerProvider(context.Background(), func() (dns.Client, outbound.Manager) { return first, nil }), ContextWithSystemDialerProvider(context.Background(), func() (dns.Client, outbound.Manager) { return second, nil })}
++	var workers sync.WaitGroup
++	for i := 0; i < 2; i++ {
++		workers.Add(1)
++		go func(index int) {
++			defer workers.Done()
++			for n := 0; n < 100; n++ {
++				InitSystemDialer(second, nil)
++				ctx := InheritSystemDialerContext(context.Background(), contexts[index])
++				ips, err := LookupForIPContext(ctx, "synthetic.invalid", DomainStrategy_USE_IP4, nil)
++				if err != nil || len(ips) != 1 || !ips[0].Equal([]net.IP{first.ip, second.ip}[index]) {
++					t.Error("source DNS crossed instance", err)
++				}
++			}
++		}(i)
++	}
++	workers.Wait()
++	missing := ContextWithSystemDialerProvider(context.Background(), func() (dns.Client, outbound.Manager) { return nil, nil })
++	if _, err := LookupForIPContext(missing, "synthetic.invalid", DomainStrategy_USE_IP4, nil); err == nil {
++		t.Fatal("missing own feature fell back to foreign global")
++	}
++}

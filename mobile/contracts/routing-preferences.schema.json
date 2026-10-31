@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://salfetka.invalid/schemas/routing-preferences-v1",
+  "title": "Salfetka per-subscription routing preferences",
+  "description": "Semantic validation requires canonical domain/CIDR, unique rule IDs, bounded expansion and pinned geodata tags. This document is not an engine execution permission.",
+  "$defs": {
+    "routing_matcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "value"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "domain_exact",
+            "domain_suffix",
+            "ip_cidr",
+            "geosite",
+            "geoip",
+            "service"
+          ]
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        }
+      }
+    },
+    "routing_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "action",
+        "match"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "action": {
+          "enum": [
+            "tunnel",
+            "direct"
+          ]
+        },
+        "match": {
+          "$ref": "#/$defs/routing_matcher"
+        }
+      }
+    },
+    "routing_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "default_action",
+        "rules"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+        },
+        "default_action": {
+          "const": "tunnel"
+        },
+        "rules": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/routing_rule"
+          }
+        }
+      }
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "version",
+    "subscription_id",
+    "mode",
+    "revision",
+    "default_action",
+    "presets",
+    "overrides"
+  ],
+  "properties": {
+    "format": {
+      "const": "salfetka.routing_preferences"
+    },
+    "version": {
+      "const": 1
+    },
+    "subscription_id": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "mode": {
+      "enum": [
+        "vpn",
+        "bypass"
+      ]
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9223372036854775807
+    },
+    "default_action": {
+      "const": "tunnel"
+    },
+    "presets": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "revision"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,64}$"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9223372036854775807
+          }
+        }
+      }
+    },
+    "overrides": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "$ref": "#/$defs/routing_rule"
+      }
+    },
+    "android_apps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "packages"
+      ],
+      "properties": {
+        "mode": {
+          "const": "exclude"
+        },
+        "packages": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "maxLength": 255,
+            "pattern": "^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+$"
+          }
+        }
+      }
+    },
+    "source_mode": {
+      "enum": [
+        "subscription",
+        "overlay",
+        "personal"
+      ]
+    }
+  }
+}

@@ -1,0 +1,437 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://salfetka.invalid/schemas/subscription-manifest-v2",
+  "title": "Salfetka source-defined subscription manifest v2",
+  "description": "Maximum UTF-8 payload size 524288 bytes. Cross-reference, engine, native-policy, expiry and traffic-scope invariants require semantic validation; this schema alone does not authorize executing settings.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "version",
+    "id",
+    "revision",
+    "subscription",
+    "network",
+    "connections",
+    "locations"
+  ],
+  "properties": {
+    "format": {
+      "const": "salfetka.subscription"
+    },
+    "version": {
+      "const": 2
+    },
+    "id": {
+      "$ref": "#/$defs/id"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9223372036854775807,
+      "description": "Configuration/presentation revision. The subscription metadata object may change without a revision bump; refresh fingerprints exclude that object."
+    },
+    "subscription": {
+      "$ref": "#/$defs/subscription"
+    },
+    "valid_until": {
+      "$ref": "#/$defs/dateTime",
+      "description": "Optional configuration/cache lease, separate from the paid subscription expiry."
+    },
+    "network": {
+      "$ref": "#/$defs/network"
+    },
+    "connections": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "$ref": "#/$defs/connection"
+      }
+    },
+    "locations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "$ref": "#/$defs/location"
+      },
+      "description": "Source order is presentation order. The application must not synthesize an Auto location or infer groups from countries/names."
+    },
+    "routing": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "vpn": {
+          "$ref": "#/$defs/routing_policy"
+        },
+        "bypass": {
+          "$ref": "#/$defs/routing_policy"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+    },
+    "dateTime": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[+-][0-9]{2}:[0-9]{2})$",
+      "description": "RFC3339 date-time with an explicit timezone; actual calendar/time validity also requires format checking."
+    },
+    "subscription": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title"
+      ],
+      "properties": {
+        "title": {
+          "$ref": "#/$defs/title"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^[^\\u0000-\\u0009\\u000b\\u000c\\u000e-\\u001f\\u007f-\\u009f]*$",
+          "description": "Bounded display text. CR/LF are allowed and normalized to LF; other control characters are rejected."
+        },
+        "expires_at": {
+          "$ref": "#/$defs/dateTime",
+          "description": "Source-reported subscription expiry. Absence means unknown; it is not replaced with valid_until."
+        },
+        "traffic": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {
+            "$ref": "#/$defs/traffic"
+          },
+          "description": "Unique scopes. A subscription-wide record and per-mode records cannot coexist; semantic validation rejects this ambiguity."
+        }
+      }
+    },
+    "traffic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope"
+      ],
+      "properties": {
+        "scope": {
+          "enum": [
+            "subscription",
+            "vpn",
+            "bypass"
+          ]
+        },
+        "upload_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 18446744073709551615
+        },
+        "download_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 18446744073709551615
+        },
+        "limit_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 18446744073709551615
+        },
+        "unlimited": {
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "unlimited"
+            ],
+            "properties": {
+              "unlimited": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "limit_bytes"
+              ]
+            }
+          }
+        }
+      ],
+      "description": "Bytes, not bits. Missing counters/limit remain unknown. Explicit zero is zero; unlimited is explicit and cannot accompany a numeric limit."
+    },
+    "network": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dns_servers",
+        "probe"
+      ],
+      "properties": {
+        "dns_servers": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "format": "ipv4"
+          }
+        },
+        "probe": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "url",
+            "ipv4",
+            "expected_status",
+            "body_sha256"
+          ],
+          "properties": {
+            "url": {
+              "type": "string",
+              "format": "uri",
+              "pattern": "^https://",
+              "description": "No userinfo, query or fragment; verified TLS and no redirects. Probe settings are not source Xray DNS/routing policy."
+            },
+            "ipv4": {
+              "type": "string",
+              "format": "ipv4"
+            },
+            "expected_status": {
+              "type": "integer",
+              "minimum": 200,
+              "maximum": 299
+            },
+            "body_sha256": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "connection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "engine",
+        "settings"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "engine": {
+          "enum": [
+            "xray",
+            "olcrtc",
+            "openflux"
+          ]
+        },
+        "settings": {
+          "type": "object",
+          "minProperties": 1,
+          "description": "Private engine-specific settings, separately validated. Native Xray uses settings.xray_config with the original allowed full config; single-outbound Xray may use settings.outbound. Never log/export this object."
+        },
+        "routing_role": {
+          "const": "transport_only",
+          "description": "Requires strict native authority validation, never discards destination routing."
+        }
+      }
+    },
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "mode",
+        "kind",
+        "title",
+        "connection_ids",
+        "selection"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "mode": {
+          "enum": [
+            "vpn",
+            "bypass"
+          ]
+        },
+        "kind": {
+          "enum": [
+            "location",
+            "auto"
+          ]
+        },
+        "title": {
+          "$ref": "#/$defs/title"
+        },
+        "icon": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$",
+          "description": "Source-provided text/emoji, not an image URL or instruction to fetch remote media."
+        },
+        "country": {
+          "type": "string",
+          "pattern": "^[A-Z]{2}$",
+          "description": "Optional country metadata; absence means unknown. It does not define the title, membership or policy."
+        },
+        "connection_ids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        },
+        "selection": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ],
+          "properties": {
+            "type": {
+              "enum": [
+                "first_working",
+                "native"
+              ]
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "selection": {
+                "properties": {
+                  "type": {
+                    "const": "native"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "mode": {
+                "const": "vpn"
+              },
+              "connection_ids": {
+                "maxItems": 1
+              }
+            }
+          }
+        }
+      ],
+      "description": "Every member must exist and match the mode: VPN=xray; bypass=olcrtc/openflux. Native references exactly one full Xray record; native Auto must have an actual valid source balancer. Semantic validators enforce these references."
+    },
+    "routing_matcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "value"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "domain_exact",
+            "domain_suffix",
+            "ip_cidr",
+            "geosite",
+            "geoip"
+          ]
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        }
+      }
+    },
+    "routing_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "action",
+        "match"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "action": {
+          "enum": [
+            "tunnel",
+            "direct"
+          ]
+        },
+        "match": {
+          "$ref": "#/$defs/routing_matcher"
+        }
+      }
+    },
+    "routing_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "default_action",
+        "rules"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+        },
+        "default_action": {
+          "const": "tunnel"
+        },
+        "rules": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/routing_rule"
+          }
+        }
+      }
+    }
+  }
+}

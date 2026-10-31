@@ -1,0 +1,230 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://salfetka.invalid/schemas/routing-measurement-v1",
+  "title": "Trusted routed measurement options",
+  "description": "Host-only envelope, at most 524288 UTF-8 bytes. Requires exact subscription/mode identity, source authority validation and protected physical binding; source JSON cannot supply this capability. Old measurement ABI remains separate.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "version",
+    "subscription_id",
+    "interface_name",
+    "options",
+    "preferences"
+  ],
+  "properties": {
+    "format": {
+      "const": "salfetka.routing_measurement"
+    },
+    "version": {
+      "const": 1
+    },
+    "subscription_id": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "interface_name": {
+      "type": "string",
+      "pattern": "^(en[0-9]{1,4}|pdp_ip[0-9]{1,4})$"
+    },
+    "options": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "vpn_concurrency",
+        "vpn_samples",
+        "bypass_health",
+        "skip_bypass",
+        "bypass_check"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "vpn_concurrency": {
+          "const": 2
+        },
+        "vpn_samples": {
+          "const": 3
+        },
+        "bypass_health": {
+          "const": true
+        },
+        "skip_bypass": {
+          "type": "boolean"
+        },
+        "bypass_check": {
+          "const": "domain"
+        }
+      }
+    },
+    "preferences": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "vpn": {
+          "$ref": "#/$defs/measurement_preferences"
+        },
+        "bypass": {
+          "$ref": "#/$defs/measurement_preferences"
+        }
+      },
+      "description": "Only user-managed modes may be present. Managed modes omit dormant local preferences; an empty object is valid."
+    }
+  },
+  "$defs": {
+    "routing_matcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "value"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "domain_exact",
+            "domain_suffix",
+            "ip_cidr",
+            "geosite",
+            "geoip",
+            "service"
+          ]
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        }
+      }
+    },
+    "routing_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "action",
+        "match"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "action": {
+          "enum": [
+            "tunnel",
+            "direct"
+          ]
+        },
+        "match": {
+          "$ref": "#/$defs/routing_matcher"
+        }
+      }
+    },
+    "routing_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "default_action",
+        "rules"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+        },
+        "default_action": {
+          "const": "tunnel"
+        },
+        "rules": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/routing_rule"
+          }
+        }
+      }
+    },
+    "measurement_preferences": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "version",
+        "subscription_id",
+        "mode",
+        "revision",
+        "default_action",
+        "presets",
+        "overrides"
+      ],
+      "properties": {
+        "format": {
+          "const": "salfetka.routing_preferences"
+        },
+        "version": {
+          "const": 1
+        },
+        "subscription_id": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
+        "mode": {
+          "enum": [
+            "vpn",
+            "bypass"
+          ]
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        },
+        "default_action": {
+          "const": "tunnel"
+        },
+        "presets": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "revision"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{1,64}$"
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9223372036854775807
+              }
+            }
+          }
+        },
+        "overrides": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/routing_rule"
+          }
+        }
+      }
+    }
+  }
+}

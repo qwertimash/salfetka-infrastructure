@@ -1,0 +1,32 @@
+{
+  "status": "LOCAL_DRY_RUN_PASS",
+  "production_modified": false,
+  "public_subscription_get_performed": false,
+  "device_registration_performed": false,
+  "primary_repository": "remnawave/backend",
+  "primary_revision": "b22970cc88481a7e278b5767721672a18f8b2ada",
+  "schema_engine": "upstream TypeScript Zod schemas and parser, type-erased locally",
+  "zod_version": "4.5.4",
+  "matcher_engine": "upstream ResponseRulesMatcherService, type-erased locally",
+  "rules_before": 6,
+  "rules_after": 7,
+  "inserted_before_single_final_fallback": true,
+  "existing_rules_canonical_json_equivalent": true,
+  "own_user_agents_native_json_and_extended_pass": 3,
+  "unaffected_match_cases_pass": 29,
+  "old_or_wrong_capability_cases_unchanged_pass": 11,
+  "happ_control_cases_unchanged_pass": 4,
+  "case_sensitive_prefix": "^Salfetka/",
+  "required_capability_header": "x-salfetka-format: source-v1",
+  "minimal_patch_fields": [
+    "uuid",
+    "responseRules"
+  ],
+  "hwid_settings_unchanged_in_local_projection": true,
+  "global_serve_json_setting_unchanged": true,
+  "host_and_template_settings_unchanged": true,
+  "before_after_rollback_private_mode": "0600",
+  "fresh_admin_settings_reread_required": true,
+  "api_compare_and_swap_confirmed": false,
+  "live_issuer_and_physical_device_acceptance": "NOT_RUN"
+}

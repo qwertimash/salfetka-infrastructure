@@ -1,0 +1,97 @@
+name: Build and publish signed release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Immutable version, e.g. 0.6.2'
+        required: true
+        type: string
+      publish:
+        description: 'Publish after all checks pass'
+        required: true
+        default: false
+        type: boolean
+permissions:
+  contents: read
+concurrency:
+  group: salfetka-release
+  cancel-in-progress: false
+jobs:
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:18.6-bookworm@sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c
+        env:
+          POSTGRES_USER: panel_test
+          POSTGRES_PASSWORD: ci-isolated-database-only
+          POSTGRES_DB: panel_test
+        ports:
+          - 5432:5432
+        options: --health-cmd "pg_isready -U panel_test" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PANEL_TEST_DATABASE_URL: postgres://panel_test:ci-isolated-database-only@127.0.0.1:5432/panel_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version: '1.27.1'
+          cache-dependency-path: |
+            panel/go.sum
+            panel/engine/xray/go.sum
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: panel/web/package-lock.json
+      - name: Validate version and build
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_ARCH: ${{ matrix.arch }}
+        run: |
+          python3 -c 'import os,re; assert re.fullmatch(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)",os.environ["RELEASE_VERSION"])'
+          mkdir dist
+          sh panel/scripts/ci-release.sh "$RELEASE_VERSION" "$RELEASE_ARCH"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: linux-${{ matrix.arch }}
+          path: dist
+          retention-days: 7
+          compression-level: 0
+  publish:
+    if: ${{ inputs.publish && github.ref == 'refs/heads/main' }}
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          path: packages
+      - name: Sign and publish immutable artifacts
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          SIGNING_KEY: ${{ secrets.SALFETKA_RELEASE_SIGNING_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          umask 077
+          key="$RUNNER_TEMP/salfetka-signing-key.pem"
+          trap 'rm -f "$key"' EXIT
+          python3 -c 'import os,pathlib; pathlib.Path(os.environ["RUNNER_TEMP"],"salfetka-signing-key.pem").write_text(os.environ.pop("SIGNING_KEY"))'
+          unset SIGNING_KEY
+          python3 panel/scripts/build-release.py --version "$RELEASE_VERSION" --signing-key "$key" --output release \
+            --panel amd64=packages/linux-amd64/panel --node amd64=packages/linux-amd64/node \
+            --panel arm64=packages/linux-arm64/panel --node arm64=packages/linux-arm64/node
+          gh release create "v$RELEASE_VERSION" release/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "САЛФЕТКА $RELEASE_VERSION" --generate-notes --draft
+          gh release edit "v$RELEASE_VERSION" --repo "$GITHUB_REPOSITORY" --draft=false --latest

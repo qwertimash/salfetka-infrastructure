@@ -1,0 +1,11 @@
+{
+  "name": "Salfetka native Xray JSON",
+  "enabled": true,
+  "operator": "AND",
+  "conditions": [
+    {"headerName": "user-agent", "operator": "REGEX", "value": "^Salfetka/", "caseSensitive": true},
+    {"headerName": "x-salfetka-format", "operator": "EQUALS", "value": "source-v1", "caseSensitive": true}
+  ],
+  "responseType": "XRAY_JSON",
+  "responseModifications": {"additionalExtendedClientsRegex": ["^Salfetka/"]}
+}

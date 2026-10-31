@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Salfetka lab selection v1",
+  "type": "object", "additionalProperties": false,
+  "required": ["mode", "network_context"],
+  "properties": {
+    "mode": {"enum": ["vpn", "bypass"]},
+    "country": {"type": "string", "pattern": "^([A-Z]{2})?$"},
+    "profile_id": {"type": "string", "pattern": "^[A-Za-z0-9_-]{0,64}$"},
+    "location_id": {"type": "string", "pattern": "^[A-Za-z0-9_-]{0,64}$", "description": "Required nonempty for runtime v3: exact explicit source group membership. Missing/unknown must not become global Auto."},
+    "engine": {"enum": ["", "xray", "olcrtc", "openflux"], "description": "Optional method constraint; missing/empty preserves country-only selection. Never widens a missing method."},
+    "network_context": {"type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$", "description": "Opaque local network generation, never SSID, carrier identifier, IP or HWID."}
+  },
+  "allOf": [
+    {"if": {"properties": {"mode": {"const": "vpn"}}}, "then": {"properties": {"engine": {"enum": ["", "xray"]}}}, "else": {"properties": {"engine": {"enum": ["", "olcrtc", "openflux"]}}}}
+  ]
+}

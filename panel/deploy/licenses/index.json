@@ -1,0 +1,83 @@
+{
+  "scope": "Notices copied unchanged from pinned Go runtime modules and bundled web runtime packages; build/test package metadata is recorded separately",
+  "packages": [
+    {
+      "name": "github.com/jackc/pgpassfile",
+      "version": "v1.0.0",
+      "license_file": "github.com_jackc_pgpassfile.txt",
+      "sha256": "adb1663fda031df8f4344aa68f299fd87d80353e31339406742ded21dae65702"
+    },
+    {
+      "name": "github.com/jackc/pgservicefile",
+      "version": "v0.0.0-20240606120523-5a60cdf6a761",
+      "license_file": "github.com_jackc_pgservicefile.txt",
+      "sha256": "fc505773403fe869ed64cc2235cdd13988a427bb7e3a7e7004a3f4b27420f8fc"
+    },
+    {
+      "name": "github.com/jackc/pgx/v5",
+      "version": "v5.11.0",
+      "license_file": "github.com_jackc_pgx_v5.txt",
+      "sha256": "467f95e074fe23079a5623ed652619682692041b8551da27e3c2ddb9659a1507"
+    },
+    {
+      "name": "github.com/jackc/puddle/v2",
+      "version": "v2.2.2",
+      "license_file": "github.com_jackc_puddle_v2.txt",
+      "sha256": "2d50e98a4900b4d6457a38d39c1432fdc156fc2f7b365f2e33ec9344acbb0057"
+    },
+    {
+      "name": "golang.org/x/crypto",
+      "version": "v0.57.0",
+      "license_file": "golang.org_x_crypto.txt",
+      "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+    },
+    {
+      "name": "golang.org/x/sync",
+      "version": "v0.23.0",
+      "license_file": "golang.org_x_sync.txt",
+      "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+    },
+    {
+      "name": "golang.org/x/sys",
+      "version": "v0.48.0",
+      "license_file": "golang.org_x_sys.txt",
+      "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+    },
+    {
+      "name": "golang.org/x/text",
+      "version": "v0.42.0",
+      "license_file": "golang.org_x_text.txt",
+      "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+    },
+    {
+      "name": "react",
+      "version": "19.3.0",
+      "license_file": "npm_react.txt",
+      "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "name": "react-dom",
+      "version": "19.3.0",
+      "license_file": "npm_react-dom.txt",
+      "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "name": "scheduler",
+      "version": "0.28.0",
+      "license_file": "npm_scheduler.txt",
+      "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "name": "Go standard library",
+      "version": "1.27.1",
+      "license_file": "go-standard-library.txt",
+      "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+    },
+    {
+      "name": "github.com/santhosh-tekuri/jsonschema/v6",
+      "version": "v6.0.3",
+      "license_file": "github.com_santhosh-tekuri_jsonschema_v6.txt",
+      "sha256": "c8858a5a76440bbca484e134cf7df46385d090dd18b2c58e650f939258802e5b"
+    }
+  ]
+}

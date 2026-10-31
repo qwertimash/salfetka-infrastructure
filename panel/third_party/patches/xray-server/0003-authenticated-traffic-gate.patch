@@ -1,0 +1,186 @@
+--- a/app/dispatcher/default.go
++++ b/app/dispatcher/default.go
+@@ -93,11 +93,12 @@
+ 
+ // DefaultDispatcher is a default implementation of Dispatcher.
+ type DefaultDispatcher struct {
+-	ohm    outbound.Manager
+-	router routing.Router
+-	policy policy.Manager
+-	stats  stats.Manager
+-	fdns   dns.FakeDNSEngine
++	trafficGate TrafficGate
++	ohm         outbound.Manager
++	router      routing.Router
++	policy      policy.Manager
++	stats       stats.Manager
++	fdns        dns.FakeDNSEngine
+ }
+ 
+ func init() {
+@@ -184,6 +185,7 @@
+ 		}
+ 	}
+ 
++	d.gateLinks(ctx, inboundLink, outboundLink)
+ 	return inboundLink, outboundLink
+ }
+ 
+@@ -338,6 +340,7 @@
+ 		content = new(session.Content)
+ 		ctx = session.ContextWithContent(ctx, content)
+ 	}
++	d.gateDirectLink(ctx, outbound)
+ 	outbound = WrapLink(ctx, d.policy, d.stats, outbound)
+ 	sniffingRequest := content.SniffingRequest
+ 	if !sniffingRequest.Enabled {
+--- /dev/null
++++ b/app/dispatcher/traffic_gate.go
+@@ -0,0 +1,147 @@
++package dispatcher
++
++import (
++	"context"
++	"io"
++	"sync"
++
++	"github.com/xtls/xray-core/common"
++	"github.com/xtls/xray-core/common/buf"
++	"github.com/xtls/xray-core/common/session"
++	"github.com/xtls/xray-core/transport"
++)
++
++// TrafficGate must be configured before starting the owning core instance.
++// The authenticated user is supplied by the inbound, never a client header.
++// Wait must honor ctx and a shared account budget across BOTH directions. A
++// nil gate preserves the original path. Policy can change inside the callback
++// without reconnecting streams; the callback itself remains immutable.
++type TrafficGate func(ctx context.Context, user, direction string, size int) error
++
++func (d *DefaultDispatcher) SetTrafficGate(g TrafficGate) { d.trafficGate = g }
++func (d *DefaultDispatcher) gateIdentity(ctx context.Context) string {
++	if d.trafficGate == nil {
++		return ""
++	}
++	inbound := session.InboundFromContext(ctx)
++	if inbound == nil || inbound.User == nil || inbound.User.Email == "" {
++		return ""
++	}
++	// Linux splice would skip application writers and the account budget. Keep
++	// the buffered path for the lifetime of enrolled streams, including while
++	// they are currently unlimited. Vision must not re-enable splice later.
++	inbound.CanSpliceCopy = 3
++	return inbound.User.Email
++}
++func (d *DefaultDispatcher) gateLinks(ctx context.Context, inbound, outbound *transport.Link) {
++	user := d.gateIdentity(ctx)
++	if user == "" {
++		return
++	}
++	inbound.Writer = newTrafficWriter(ctx, d.trafficGate, user, "upload", inbound.Writer)
++	outbound.Writer = newTrafficWriter(ctx, d.trafficGate, user, "download", outbound.Writer)
++}
++func (d *DefaultDispatcher) gateDirectLink(ctx context.Context, link *transport.Link) {
++	user := d.gateIdentity(ctx)
++	if user == "" {
++		return
++	}
++	rctx, cancel := context.WithCancel(ctx)
++	link.Reader = &trafficReader{ctx: rctx, cancel: cancel, gate: d.trafficGate, user: user, reader: link.Reader}
++	link.Writer = newTrafficWriter(ctx, d.trafficGate, user, "download", link.Writer)
++}
++
++type trafficWriter struct {
++	ctx             context.Context
++	cancel          context.CancelFunc
++	gate            TrafficGate
++	user, direction string
++	writer          buf.Writer
++}
++
++func newTrafficWriter(ctx context.Context, g TrafficGate, user, direction string, w buf.Writer) *trafficWriter {
++	child, cancel := context.WithCancel(ctx)
++	return &trafficWriter{child, cancel, g, user, direction, w}
++}
++func (w *trafficWriter) WriteMultiBuffer(mb buf.MultiBuffer) error {
++	// Preserve each buffer's UDP destination and datagram boundary. Each buffer
++	// is at most the protocol's maximum; never turn a large datagram into TCP-like
++	// fragments. Release ownership exactly once, including denied/failed writes.
++	for len(mb) > 0 {
++		rest, b := buf.SplitFirst(mb)
++		mb = rest
++		if err := w.gate(w.ctx, w.user, w.direction, int(b.Len())); err != nil {
++			b.Release()
++			buf.ReleaseMulti(mb)
++			return err
++		}
++		if err := w.writer.WriteMultiBuffer(buf.MultiBuffer{b}); err != nil {
++			buf.ReleaseMulti(mb)
++			return err
++		}
++	}
++	return nil
++}
++func (w *trafficWriter) Close() error { w.cancel(); return common.Close(w.writer) }
++func (w *trafficWriter) Interrupt()   { w.cancel(); common.Interrupt(w.writer) }
++
++type trafficReader struct {
++	ctx     context.Context
++	cancel  context.CancelFunc
++	gate    TrafficGate
++	user    string
++	reader  buf.Reader
++	mu      sync.Mutex
++	pending buf.MultiBuffer
++	lastErr error
++	closed  bool
++}
++
++func (r *trafficReader) ReadMultiBuffer() (buf.MultiBuffer, error) {
++	r.mu.Lock()
++	if r.closed {
++		r.mu.Unlock()
++		return nil, io.ErrClosedPipe
++	}
++	empty := len(r.pending) == 0
++	r.mu.Unlock()
++	if empty {
++		mb, err := r.reader.ReadMultiBuffer()
++		r.mu.Lock()
++		if r.closed {
++			r.mu.Unlock()
++			buf.ReleaseMulti(mb)
++			return nil, io.ErrClosedPipe
++		}
++		r.pending = mb
++		r.lastErr = err
++		r.mu.Unlock()
++	}
++	r.mu.Lock()
++	rest, b := buf.SplitFirst(r.pending)
++	r.pending = rest
++	var err error
++	if len(rest) == 0 {
++		err = r.lastErr
++		r.lastErr = nil
++	}
++	r.mu.Unlock()
++	if b == nil {
++		return nil, err
++	}
++	if gateErr := r.gate(r.ctx, r.user, "upload", int(b.Len())); gateErr != nil {
++		b.Release()
++		r.Interrupt()
++		return nil, gateErr
++	}
++	return buf.MultiBuffer{b}, err
++}
++func (r *trafficReader) stop() {
++	r.cancel()
++	r.mu.Lock()
++	r.closed = true
++	r.pending = buf.ReleaseMulti(r.pending)
++	r.mu.Unlock()
++}
++func (r *trafficReader) Close() error { r.stop(); return common.Close(r.reader) }
++func (r *trafficReader) Interrupt()   { r.stop(); common.Interrupt(r.reader) }

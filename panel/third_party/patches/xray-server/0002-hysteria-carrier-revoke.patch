@@ -1,0 +1,245 @@
+--- a/proxy/hysteria/server.go
++++ b/proxy/hysteria/server.go
+@@ -176,3 +176,5 @@
+ 		return NewServer(ctx, config.(*ServerConfig))
+ 	}))
+ }
++
++func (s *Server) Close() error { return s.validator.Close() }
+--- a/proxy/hysteria/account/config.go
++++ b/proxy/hysteria/account/config.go
+@@ -1,6 +1,7 @@
+ package account
+ 
+ import (
++	"errors"
+ 	"sync"
+ 
+ 	"github.com/xtls/xray-core/common/net"
+@@ -40,9 +41,12 @@
+ }
+ 
+ type Validator struct {
+-	users sync.Map
+-	ids   sync.Map
+-	mu    sync.Mutex
++	users    sync.Map
++	ids      sync.Map
++	mu       sync.Mutex
++	sessions map[*protocol.MemoryUser]map[uint64]func()
++	next     uint64
++	closed   bool
+ }
+ 
+ func NewValidator() *Validator {
+@@ -51,19 +55,33 @@
+ 
+ func (v *Validator) Add(user *protocol.MemoryUser) (err error) {
+ 	v.mu.Lock()
++	defer v.mu.Unlock()
++	if v.closed {
++		return errors.New("validator closed")
++	}
++	auth := user.Account.(*MemoryAccount).Auth
++	if v.Get(auth) != nil || (user.Email != "" && v.GetByEmail(user.Email) != nil) {
++		return errors.New("duplicate user")
++	}
++	if v.sessions == nil {
++		v.sessions = make(map[*protocol.MemoryUser]map[uint64]func())
++	}
++	v.sessions[user] = make(map[uint64]func())
+ 	v.users.Store(user.Account.(*MemoryAccount).Auth, user)
+ 	if id, err := uuid.Parse(user.Account.(*MemoryAccount).Auth); err == nil {
+ 		id[6] = 0
+ 		id[7] = 0
+ 		v.ids.Store(id, user)
+ 	}
+-	v.mu.Unlock()
+ 	return
+ }
+ 
+ func (v *Validator) DelByEmail(email string) (err error) {
+ 	v.mu.Lock()
++	var owned map[uint64]func()
+ 	if user := v.GetByEmail(email); user != nil {
++		owned = v.sessions[user]
++		delete(v.sessions, user)
+ 		auth := user.Account.(*MemoryAccount).Auth
+ 		v.users.Delete(auth)
+ 		if id, err := uuid.Parse(auth); err == nil {
+@@ -73,6 +91,9 @@
+ 		}
+ 	}
+ 	v.mu.Unlock()
++	for _, close := range owned {
++		close()
++	}
+ 	return
+ }
+ 
+@@ -142,3 +163,39 @@
+ 	})
+ 	return
+ }
++
++// AuthenticateAndTrack is the admission linearization point. Revocation denies
++// the incarnation before closing its whole QUIC carriers, including all streams.
++func (v *Validator) AuthenticateAndTrack(auth string, close func()) (*protocol.MemoryUser, func()) {
++	v.mu.Lock()
++	defer v.mu.Unlock()
++	u := v.Get(auth)
++	if v.closed || u == nil || close == nil {
++		return nil, nil
++	}
++	owner := v.GetByEmail(u.Email)
++	sessions, ok := v.sessions[owner]
++	if !ok {
++		return nil, nil
++	}
++	v.next++
++	id := v.next
++	sessions[id] = close
++	return u, func() { v.mu.Lock(); delete(v.sessions[owner], id); v.mu.Unlock() }
++}
++
++func (v *Validator) Close() error {
++	v.mu.Lock()
++	v.closed = true
++	owned := v.sessions
++	v.sessions = nil
++	v.users.Clear()
++	v.ids.Clear()
++	v.mu.Unlock()
++	for _, sessions := range owned {
++		for _, close := range sessions {
++			close()
++		}
++	}
++	return nil
++}
+--- a/transport/internet/hysteria/hub.go
++++ b/transport/internet/hysteria/hub.go
+@@ -37,8 +37,9 @@
+ 	addConn     internet.ConnHandler
+ 	conn        *quic.Conn
+ 
+-	auth bool
+-	user *protocol.MemoryUser
++	auth    bool
++	user    *protocol.MemoryUser
++	release func()
+ }
+ 
+ func (h *httpHandler) AuthHTTP(w http.ResponseWriter, r *http.Request) bool {
+@@ -60,7 +61,7 @@
+ 		var user *protocol.MemoryUser
+ 		var ok bool
+ 		if h.validator != nil && h.validator.NotEmpty() {
+-			user = h.validator.Get(auth)
++			user, h.release = h.validator.AuthenticateAndTrack(auth, func() { _ = h.conn.CloseWithError(0x100, "access revoked") })
+ 		} else if h.config.Auth != "" {
+ 			ok = auth == h.config.Auth
+ 		}
+@@ -118,7 +119,10 @@
+ }
+ 
+ func (h *httpHandler) StreamDispatcher(ft http3.FrameType, stream *quic.Stream, err error) (bool, error) {
+-	if err != nil || !h.auth {
++	h.Lock()
++	authenticated, user := h.auth, h.user
++	h.Unlock()
++	if err != nil || !authenticated {
+ 		return false, nil
+ 	}
+ 
+@@ -133,7 +137,7 @@
+ 			local:  h.conn.LocalAddr(),
+ 			remote: h.conn.RemoteAddr(),
+ 
+-			user: h.user,
++			user: user,
+ 		})
+ 		return true, nil
+ 	default:
+@@ -167,6 +171,12 @@
+ 		StreamDispatcher: handler.StreamDispatcher,
+ 	}
+ 	err := h3s.ServeQUICConn(conn)
++	handler.Lock()
++	release := handler.release
++	handler.Unlock()
++	if release != nil {
++		release()
++	}
+ 	_ = conn.CloseWithError(closeErrCodeOK, "")
+ 	errors.LogDebug(context.Background(), conn.RemoteAddr(), " ServeQUICConn exited with ", err)
+ }
+--- a/transport/internet/hysteria/conn.go
++++ b/transport/internet/hysteria/conn.go
+@@ -5,6 +5,7 @@
+ 	"encoding/binary"
+ 	"io"
+ 	"sync"
++	"sync/atomic"
+ 	"time"
+ 
+ 	"github.com/apernet/quic-go"
+@@ -77,7 +78,7 @@
+ 	ch     chan []byte
+ 	time   time.Time
+ 	mutex  sync.Mutex
+-	closed bool
++	closed atomic.Bool
+ 
+ 	write func(p []byte) error
+ 	close func()
+@@ -111,7 +112,7 @@
+ }
+ 
+ func (c *InterConn) Write(p []byte) (int, error) {
+-	if c.closed {
++	if c.closed.Load() {
+ 		return 0, io.ErrClosedPipe
+ 	}
+ 	binary.BigEndian.PutUint32(p, c.id)
+@@ -161,8 +162,7 @@
+ }
+ 
+ func (m *udpSessionManager) close(udpConn *InterConn) {
+-	if !udpConn.closed {
+-		udpConn.closed = true
++	if !udpConn.closed.Swap(true) {
+ 		close(udpConn.ch)
+ 		delete(m.m, udpConn.id)
+ 	}
+@@ -172,12 +172,17 @@
+ 	ticker := time.NewTicker(idleCleanupInterval)
+ 	defer ticker.Stop()
+ 
+-	for range ticker.C {
++	for {
++		select {
++		case <-m.conn.Context().Done():
++			return
++		case <-ticker.C:
++		}
++		m.RLock()
+ 		if m.closed {
++			m.RUnlock()
+ 			return
+ 		}
+-
+-		m.RLock()
+ 		now := time.Now()
+ 		timeoutConn := make([]*InterConn, 0, len(m.m))
+ 		for _, udpConn := range m.m {
+@@ -267,6 +272,9 @@
+ 	m.Lock()
+ 	defer m.Unlock()
+ 
++	if m.closed {
++		return
++	}
+ 	udpConn, ok = m.m[id]
+ 	if !ok {
+ 		udpConn = &InterConn{

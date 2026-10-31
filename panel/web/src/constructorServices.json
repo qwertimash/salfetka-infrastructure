@@ -1,0 +1,60 @@
+{
+  "revision": 1,
+  "services": [
+    {
+      "id": "vk",
+      "title": "ВКонтакте",
+      "matchers": [
+        {
+          "type": "domain_suffix",
+          "value": "vk.com"
+        }
+      ],
+      "coverage": "domains_only"
+    },
+    {
+      "id": "ok",
+      "title": "Одноклассники",
+      "matchers": [
+        {
+          "type": "domain_suffix",
+          "value": "ok.ru"
+        }
+      ],
+      "coverage": "domains_only"
+    },
+    {
+      "id": "gosuslugi",
+      "title": "Госуслуги",
+      "matchers": [
+        {
+          "type": "domain_suffix",
+          "value": "gosuslugi.ru"
+        }
+      ],
+      "coverage": "domains_only"
+    },
+    {
+      "id": "burgerking",
+      "title": "Бургер Кинг",
+      "matchers": [
+        {
+          "type": "domain_suffix",
+          "value": "burgerkingrus.ru"
+        }
+      ],
+      "coverage": "domains_only"
+    },
+    {
+      "id": "vkusnoitochka",
+      "title": "Вкусно — и точка",
+      "matchers": [
+        {
+          "type": "domain_suffix",
+          "value": "vkusnoitochka.ru"
+        }
+      ],
+      "coverage": "domains_only"
+    }
+  ]
+}

@@ -1,0 +1,343 @@
+{
+  "oracle_sha256": "0834be5bbc6dff97f3264dacbd4179918ad65bebebb5fcdcdc281a68d3125771",
+  "cases": [
+    {
+      "name": "vless-1",
+      "input": "vless://11111111-1111-4111-8111-111111111111@vpn.example.com:443?security=tls&type=tcp#%F0%9F%87%AB%F0%9F%87%AE%20Synthetic",
+      "settings": {
+        "outbound": {
+          "protocol": "vless",
+          "settings": {
+            "vnext": [
+              {
+                "address": "vpn.example.com",
+                "port": 443,
+                "users": [
+                  {
+                    "id": "11111111-1111-4111-8111-111111111111",
+                    "encryption": "none"
+                  }
+                ]
+              }
+            ]
+          },
+          "streamSettings": {
+            "network": "tcp",
+            "security": "tls",
+            "tlsSettings": {
+              "serverName": "vpn.example.com",
+              "allowInsecure": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "vless-2",
+      "input": "vless://11111111-1111-4111-8111-111111111111@vpn.example.com:443?security=tls&type=raw&flow=xtls-rprx-vision&alpn=h2,http/1.1#%F0%9F%87%AB%F0%9F%87%AE%20Synthetic",
+      "settings": {
+        "outbound": {
+          "protocol": "vless",
+          "settings": {
+            "vnext": [
+              {
+                "address": "vpn.example.com",
+                "port": 443,
+                "users": [
+                  {
+                    "id": "11111111-1111-4111-8111-111111111111",
+                    "encryption": "none",
+                    "flow": "xtls-rprx-vision"
+                  }
+                ]
+              }
+            ]
+          },
+          "streamSettings": {
+            "network": "raw",
+            "security": "tls",
+            "tlsSettings": {
+              "serverName": "vpn.example.com",
+              "allowInsecure": false,
+              "alpn": [
+                "h2",
+                "http/1.1"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "vless-3",
+      "input": "vless://11111111-1111-4111-8111-111111111111@vpn.example.com:443?security=tls&type=grpc&serviceName=test&mode=multi&authority=example.com#%F0%9F%87%AB%F0%9F%87%AE%20Synthetic",
+      "settings": {
+        "outbound": {
+          "protocol": "vless",
+          "settings": {
+            "vnext": [
+              {
+                "address": "vpn.example.com",
+                "port": 443,
+                "users": [
+                  {
+                    "id": "11111111-1111-4111-8111-111111111111",
+                    "encryption": "none"
+                  }
+                ]
+              }
+            ]
+          },
+          "streamSettings": {
+            "network": "grpc",
+            "security": "tls",
+            "tlsSettings": {
+              "serverName": "vpn.example.com",
+              "allowInsecure": false
+            },
+            "grpcSettings": {
+              "serviceName": "test",
+              "multiMode": true,
+              "authority": "example.com"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "vless-4",
+      "input": "vless://11111111-1111-4111-8111-111111111111@vpn.example.com:443?security=tls&type=xhttp&path=%2Ftest&mode=packet-up&host=example.com#%F0%9F%87%AB%F0%9F%87%AE%20Synthetic",
+      "settings": {
+        "outbound": {
+          "protocol": "vless",
+          "settings": {
+            "vnext": [
+              {
+                "address": "vpn.example.com",
+                "port": 443,
+                "users": [
+                  {
+                    "id": "11111111-1111-4111-8111-111111111111",
+                    "encryption": "none"
+                  }
+                ]
+              }
+            ]
+          },
+          "streamSettings": {
+            "network": "xhttp",
+            "security": "tls",
+            "tlsSettings": {
+              "serverName": "vpn.example.com",
+              "allowInsecure": false
+            },
+            "xhttpSettings": {
+              "path": "/test",
+              "mode": "packet-up",
+              "host": "example.com"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "vless-5",
+      "input": "vless://11111111-1111-4111-8111-111111111111@vpn.example.com:443?security=tls&type=ws&path=%2Ftest&host=example.com#%F0%9F%87%AB%F0%9F%87%AE%20Synthetic",
+      "settings": {
+        "outbound": {
+          "protocol": "vless",
+          "settings": {
+            "vnext": [
+              {
+                "address": "vpn.example.com",
+                "port": 443,
+                "users": [
+                  {
+                    "id": "11111111-1111-4111-8111-111111111111",
+                    "encryption": "none"
+                  }
+                ]
+              }
+            ]
+          },
+          "streamSettings": {
+            "network": "ws",
+            "security": "tls",
+            "tlsSettings": {
+              "serverName": "vpn.example.com",
+              "allowInsecure": false
+            },
+            "wsSettings": {
+              "path": "/test",
+              "headers": {
+                "Host": "example.com"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "vless-6",
+      "input": "vless://11111111-1111-4111-8111-111111111111@vpn.example.com:443?security=tls&type=httpupgrade&path=%2Ftest&host=example.com#%F0%9F%87%AB%F0%9F%87%AE%20Synthetic",
+      "settings": {
+        "outbound": {
+          "protocol": "vless",
+          "settings": {
+            "vnext": [
+              {
+                "address": "vpn.example.com",
+                "port": 443,
+                "users": [
+                  {
+                    "id": "11111111-1111-4111-8111-111111111111",
+                    "encryption": "none"
+                  }
+                ]
+              }
+            ]
+          },
+          "streamSettings": {
+            "network": "httpupgrade",
+            "security": "tls",
+            "tlsSettings": {
+              "serverName": "vpn.example.com",
+              "allowInsecure": false
+            },
+            "httpupgradeSettings": {
+              "path": "/test",
+              "host": "example.com"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "vless-7",
+      "input": "vless://11111111-1111-4111-8111-111111111111@vpn.example.com:443?security=reality&type=tcp&fp=chrome&pbk=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&sid=aabb&spx=%2Ftest#%F0%9F%87%AB%F0%9F%87%AE%20Synthetic",
+      "settings": {
+        "outbound": {
+          "protocol": "vless",
+          "settings": {
+            "vnext": [
+              {
+                "address": "vpn.example.com",
+                "port": 443,
+                "users": [
+                  {
+                    "id": "11111111-1111-4111-8111-111111111111",
+                    "encryption": "none"
+                  }
+                ]
+              }
+            ]
+          },
+          "streamSettings": {
+            "network": "tcp",
+            "security": "reality",
+            "realitySettings": {
+              "serverName": "vpn.example.com",
+              "fingerprint": "chrome",
+              "publicKey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+              "shortId": "aabb",
+              "spiderX": "/test"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "hy2-1",
+      "input": "hy2://synthetic-auth@vpn.example.com:443#%F0%9F%87%AB%F0%9F%87%AE%20Synthetic",
+      "settings": {
+        "outbound": {
+          "protocol": "hysteria",
+          "settings": {
+            "version": 2,
+            "address": "vpn.example.com",
+            "port": 443
+          },
+          "streamSettings": {
+            "network": "hysteria",
+            "security": "tls",
+            "tlsSettings": {
+              "serverName": "vpn.example.com",
+              "alpn": [
+                "h3"
+              ],
+              "allowInsecure": false
+            },
+            "hysteriaSettings": {
+              "version": 2,
+              "auth": "synthetic-auth"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "hy2-2",
+      "input": "hy2://synthetic-auth@vpn.example.com:443?alpn=h3&sni=vpn.example.com#%F0%9F%87%AB%F0%9F%87%AE%20Synthetic",
+      "settings": {
+        "outbound": {
+          "protocol": "hysteria",
+          "settings": {
+            "version": 2,
+            "address": "vpn.example.com",
+            "port": 443
+          },
+          "streamSettings": {
+            "network": "hysteria",
+            "security": "tls",
+            "tlsSettings": {
+              "serverName": "vpn.example.com",
+              "alpn": [
+                "h3"
+              ],
+              "allowInsecure": false
+            },
+            "hysteriaSettings": {
+              "version": 2,
+              "auth": "synthetic-auth"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "hy2-3",
+      "input": "hy2://synthetic-auth@vpn.example.com:443?fm=%7B%22quicParams%22%3A%20%7B%22congestion%22%3A%20%22bbr%22%2C%20%22debug%22%3A%20false%7D%7D#%F0%9F%87%AB%F0%9F%87%AE%20Synthetic",
+      "settings": {
+        "outbound": {
+          "protocol": "hysteria",
+          "settings": {
+            "version": 2,
+            "address": "vpn.example.com",
+            "port": 443
+          },
+          "streamSettings": {
+            "network": "hysteria",
+            "security": "tls",
+            "tlsSettings": {
+              "serverName": "vpn.example.com",
+              "alpn": [
+                "h3"
+              ],
+              "allowInsecure": false
+            },
+            "hysteriaSettings": {
+              "version": 2,
+              "auth": "synthetic-auth"
+            },
+            "finalmask": {
+              "quicParams": {
+                "congestion": "bbr",
+                "debug": false
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

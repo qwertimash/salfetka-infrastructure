@@ -1,0 +1,98 @@
+diff --git a/app/observatory/observer.go b/app/observatory/observer.go
+--- a/app/observatory/observer.go
++++ b/app/observatory/observer.go
+@@ -39,7 +39,11 @@
+ }
+ 
+ func (o *Observer) GetObservation(ctx context.Context) (proto.Message, error) {
+-	return &ObservationResult{Status: o.status}, nil
++	o.statusLock.Lock()
++	defer o.statusLock.Unlock()
++	// Callers retain observations while probes continue updating status. A
++	// shallow slice copy still shares OutboundStatus/HealthPing messages.
++	return proto.Clone(&ObservationResult{Status: o.status}), nil
+ }
+ 
+ func (o *Observer) Type() interface{} {
+diff --git a/app/observatory/salfetka_snapshot_test.go b/app/observatory/salfetka_snapshot_test.go
+new file mode 100644
+--- /dev/null
++++ b/app/observatory/salfetka_snapshot_test.go
+@@ -0,0 +1,77 @@
++package observatory
++
++import (
++	"context"
++	"sync"
++	"testing"
++)
++
++func TestSalfetkaObservationIsIndependentDeepSnapshot(t *testing.T) {
++	observer := &Observer{status: []*OutboundStatus{{
++		OutboundTag: "synthetic", Alive: true, Delay: 42,
++		HealthPing: &HealthPingMeasurementResult{All: 1, Average: 42},
++	}}}
++	message, err := observer.GetObservation(context.Background())
++	if err != nil {
++		t.Fatal(err)
++	}
++	first := message.(*ObservationResult)
++	observer.updateStatusForResult("synthetic", &ProbeResult{Alive: false, LastErrorReason: "synthetic failure"})
++	if !first.Status[0].Alive || first.Status[0].Delay != 42 || first.Status[0].LastErrorReason != "" {
++		t.Fatal("native observer returned mutable status instead of a snapshot")
++	}
++	first.Status[0].HealthPing.All = 999
++	message, err = observer.GetObservation(context.Background())
++	if err != nil {
++		t.Fatal(err)
++	}
++	if message.(*ObservationResult).Status[0].HealthPing.All != 1 {
++		t.Fatal("snapshot shared a nested protobuf message")
++	}
++}
++
++func TestSalfetkaConcurrentProbeUpdatesAndObservationSnapshots(t *testing.T) {
++	observer := &Observer{status: []*OutboundStatus{{
++		OutboundTag: "synthetic", Alive: true, Delay: 0,
++		HealthPing: &HealthPingMeasurementResult{},
++	}}}
++	var workers sync.WaitGroup
++	workers.Add(2)
++	go func() {
++		defer workers.Done()
++		for i := 0; i < 1000; i++ {
++			observer.updateStatusForResult("synthetic", &ProbeResult{Alive: true, Delay: int64(i)})
++			observer.statusLock.Lock()
++			observer.status[0].HealthPing.All = int64(i)
++			observer.statusLock.Unlock()
++		}
++	}()
++	go func() {
++		defer workers.Done()
++		for i := 0; i < 1000; i++ {
++			message, err := observer.GetObservation(context.Background())
++			if err != nil {
++				t.Error(err)
++				return
++			}
++			result := message.(*ObservationResult)
++			if len(result.Status) != 1 || result.Status[0].OutboundTag != "synthetic" {
++				t.Error("invalid native observation snapshot")
++				return
++			}
++			// Router consumers may read or retain this message after unlocking.
++			// Writes here must also never reach the live observer state.
++			result.Status[0].Delay = -1
++			result.Status[0].HealthPing.All = -1
++		}
++	}()
++	workers.Wait()
++	message, err := observer.GetObservation(context.Background())
++	if err != nil {
++		t.Fatal(err)
++	}
++	result := message.(*ObservationResult)
++	if result.Status[0].Delay < 0 || result.Status[0].HealthPing.All < 0 {
++		t.Fatal("consumer mutation reached live native status")
++	}
++}

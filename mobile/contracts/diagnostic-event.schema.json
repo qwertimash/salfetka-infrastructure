@@ -1,0 +1,3233 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://salfetka.invalid/contracts/diagnostic-event-v1",
+  "title": "Tester diagnostics v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_id",
+    "process",
+    "process_run_id",
+    "sequence",
+    "occurred_at_ms",
+    "monotonic_ms",
+    "platform",
+    "app_version",
+    "build_number",
+    "core_version",
+    "os_version",
+    "kind",
+    "payload"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "event_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "process": {
+      "enum": [
+        "app",
+        "extension",
+        "system"
+      ]
+    },
+    "process_run_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "occurred_at_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "monotonic_ms": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "platform": {
+      "enum": [
+        "ios",
+        "android"
+      ]
+    },
+    "app_version": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "build_number": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "core_version": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "os_version": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9]{1,3}(\\.[0-9]{1,3}){0,2}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "kind": {
+      "enum": [
+        "app_action",
+        "start_gate",
+        "preferences",
+        "extension_start",
+        "core_state",
+        "vpn_status",
+        "ipc",
+        "recovery",
+        "cleanup",
+        "provider_stop",
+        "app_lifecycle",
+        "network_change",
+        "memory_warning",
+        "subscription_update",
+        "ping_result",
+        "heartbeat",
+        "problem",
+        "system_diagnostic",
+        "queue_loss",
+        "historical_report",
+        "ping_trace"
+      ]
+    },
+    "payload": {
+      "type": "object"
+    },
+    "command_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "session_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "report_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "profile_alias": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "catalog_alias": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "app_action"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "action": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "connect",
+                      "disconnect",
+                      "location_change"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "mode": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "vpn",
+                      "bypass"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "country": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[A-Z]{2}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "engine": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "xray",
+                      "olcrtc",
+                      "openflux",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "monotonic_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "start_gate"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "stage": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "requested",
+                      "admitted",
+                      "refused",
+                      "loading",
+                      "saving",
+                      "starting",
+                      "preparing",
+                      "verifying",
+                      "connected",
+                      "stopping",
+                      "stopped",
+                      "failed",
+                      "cancelled",
+                      "restoring",
+                      "cleaning",
+                      "completed",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "error_code": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "unknown",
+                      "offline",
+                      "timeout",
+                      "cancelled",
+                      "configuration_failed",
+                      "provider_unavailable",
+                      "engine_failed",
+                      "engine_unavailable",
+                      "engine_timeout",
+                      "connection_lost",
+                      "cleanup_timeout",
+                      "invalid_catalog",
+                      "invalid_selection",
+                      "catalog_expired",
+                      "keychain_unavailable",
+                      "packet_io_failed",
+                      "preferences_failed",
+                      "ipc_timeout",
+                      "ipc_invalid",
+                      "memory_pressure",
+                      "network_changed",
+                      "http_error",
+                      "tls_failed",
+                      "storage_failed",
+                      "busy",
+                      "unsupported",
+                      "consent_off",
+                      "revoked",
+                      "core_not_linked",
+                      "no_fresh_data",
+                      "authentication_failed",
+                      "bootstrap_dns_failed",
+                      "bootstrap_network_failed",
+                      "bootstrap_tls_failed",
+                      "dns_failed",
+                      "engine_busy",
+                      "handshake_failed",
+                      "invalid_engine_config",
+                      "invalid_snapshot",
+                      "network_permission_denied",
+                      "no_candidates",
+                      "no_matching_profiles",
+                      "no_working_profile",
+                      "permission_denied",
+                      "permission_revoked",
+                      "probe_failed",
+                      "profile_missing",
+                      "unsupported_transport",
+                      "verification_failed"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "mode": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "vpn",
+                      "bypass"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "monotonic_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "preferences"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "stage": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "requested",
+                      "admitted",
+                      "refused",
+                      "loading",
+                      "saving",
+                      "starting",
+                      "preparing",
+                      "verifying",
+                      "connected",
+                      "stopping",
+                      "stopped",
+                      "failed",
+                      "cancelled",
+                      "restoring",
+                      "cleaning",
+                      "completed",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "error_code": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "unknown",
+                      "offline",
+                      "timeout",
+                      "cancelled",
+                      "configuration_failed",
+                      "provider_unavailable",
+                      "engine_failed",
+                      "engine_unavailable",
+                      "engine_timeout",
+                      "connection_lost",
+                      "cleanup_timeout",
+                      "invalid_catalog",
+                      "invalid_selection",
+                      "catalog_expired",
+                      "keychain_unavailable",
+                      "packet_io_failed",
+                      "preferences_failed",
+                      "ipc_timeout",
+                      "ipc_invalid",
+                      "memory_pressure",
+                      "network_changed",
+                      "http_error",
+                      "tls_failed",
+                      "storage_failed",
+                      "busy",
+                      "unsupported",
+                      "consent_off",
+                      "revoked",
+                      "core_not_linked",
+                      "no_fresh_data",
+                      "authentication_failed",
+                      "bootstrap_dns_failed",
+                      "bootstrap_network_failed",
+                      "bootstrap_tls_failed",
+                      "dns_failed",
+                      "engine_busy",
+                      "handshake_failed",
+                      "invalid_engine_config",
+                      "invalid_snapshot",
+                      "network_permission_denied",
+                      "no_candidates",
+                      "no_matching_profiles",
+                      "no_working_profile",
+                      "permission_denied",
+                      "permission_revoked",
+                      "probe_failed",
+                      "profile_missing",
+                      "unsupported_transport",
+                      "verification_failed"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "monotonic_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "extension_start"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "stage": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "requested",
+                      "admitted",
+                      "refused",
+                      "loading",
+                      "saving",
+                      "starting",
+                      "preparing",
+                      "verifying",
+                      "connected",
+                      "stopping",
+                      "stopped",
+                      "failed",
+                      "cancelled",
+                      "restoring",
+                      "cleaning",
+                      "completed",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "error_code": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "unknown",
+                      "offline",
+                      "timeout",
+                      "cancelled",
+                      "configuration_failed",
+                      "provider_unavailable",
+                      "engine_failed",
+                      "engine_unavailable",
+                      "engine_timeout",
+                      "connection_lost",
+                      "cleanup_timeout",
+                      "invalid_catalog",
+                      "invalid_selection",
+                      "catalog_expired",
+                      "keychain_unavailable",
+                      "packet_io_failed",
+                      "preferences_failed",
+                      "ipc_timeout",
+                      "ipc_invalid",
+                      "memory_pressure",
+                      "network_changed",
+                      "http_error",
+                      "tls_failed",
+                      "storage_failed",
+                      "busy",
+                      "unsupported",
+                      "consent_off",
+                      "revoked",
+                      "core_not_linked",
+                      "no_fresh_data",
+                      "authentication_failed",
+                      "bootstrap_dns_failed",
+                      "bootstrap_network_failed",
+                      "bootstrap_tls_failed",
+                      "dns_failed",
+                      "engine_busy",
+                      "handshake_failed",
+                      "invalid_engine_config",
+                      "invalid_snapshot",
+                      "network_permission_denied",
+                      "no_candidates",
+                      "no_matching_profiles",
+                      "no_working_profile",
+                      "permission_denied",
+                      "permission_revoked",
+                      "probe_failed",
+                      "profile_missing",
+                      "unsupported_transport",
+                      "verification_failed"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "mode": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "vpn",
+                      "bypass"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "monotonic_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "core_state"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "stage": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "requested",
+                      "admitted",
+                      "refused",
+                      "loading",
+                      "saving",
+                      "starting",
+                      "preparing",
+                      "verifying",
+                      "connected",
+                      "stopping",
+                      "stopped",
+                      "failed",
+                      "cancelled",
+                      "restoring",
+                      "cleaning",
+                      "completed",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "state": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "idle",
+                      "preparing",
+                      "connecting",
+                      "verifying",
+                      "connected",
+                      "switching",
+                      "recovering",
+                      "stopping",
+                      "failed",
+                      "needs_user_action",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "error_code": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "unknown",
+                      "offline",
+                      "timeout",
+                      "cancelled",
+                      "configuration_failed",
+                      "provider_unavailable",
+                      "engine_failed",
+                      "engine_unavailable",
+                      "engine_timeout",
+                      "connection_lost",
+                      "cleanup_timeout",
+                      "invalid_catalog",
+                      "invalid_selection",
+                      "catalog_expired",
+                      "keychain_unavailable",
+                      "packet_io_failed",
+                      "preferences_failed",
+                      "ipc_timeout",
+                      "ipc_invalid",
+                      "memory_pressure",
+                      "network_changed",
+                      "http_error",
+                      "tls_failed",
+                      "storage_failed",
+                      "busy",
+                      "unsupported",
+                      "consent_off",
+                      "revoked",
+                      "core_not_linked",
+                      "no_fresh_data",
+                      "authentication_failed",
+                      "bootstrap_dns_failed",
+                      "bootstrap_network_failed",
+                      "bootstrap_tls_failed",
+                      "dns_failed",
+                      "engine_busy",
+                      "handshake_failed",
+                      "invalid_engine_config",
+                      "invalid_snapshot",
+                      "network_permission_denied",
+                      "no_candidates",
+                      "no_matching_profiles",
+                      "no_working_profile",
+                      "permission_denied",
+                      "permission_revoked",
+                      "probe_failed",
+                      "profile_missing",
+                      "unsupported_transport",
+                      "verification_failed"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "country": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[A-Z]{2}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "engine": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "xray",
+                      "olcrtc",
+                      "openflux",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "transport": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "tcp",
+                      "grpc",
+                      "splithttp",
+                      "hysteria2",
+                      "datachannel",
+                      "cups",
+                      "boards",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "mode": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "vpn",
+                      "bypass"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "duration_ms": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "duration_scope": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "command",
+                      "extension_start",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "monotonic_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "vpn_status"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "state": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "idle",
+                      "preparing",
+                      "connecting",
+                      "verifying",
+                      "connected",
+                      "switching",
+                      "recovering",
+                      "stopping",
+                      "failed",
+                      "needs_user_action",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "error_code": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "unknown",
+                      "offline",
+                      "timeout",
+                      "cancelled",
+                      "configuration_failed",
+                      "provider_unavailable",
+                      "engine_failed",
+                      "engine_unavailable",
+                      "engine_timeout",
+                      "connection_lost",
+                      "cleanup_timeout",
+                      "invalid_catalog",
+                      "invalid_selection",
+                      "catalog_expired",
+                      "keychain_unavailable",
+                      "packet_io_failed",
+                      "preferences_failed",
+                      "ipc_timeout",
+                      "ipc_invalid",
+                      "memory_pressure",
+                      "network_changed",
+                      "http_error",
+                      "tls_failed",
+                      "storage_failed",
+                      "busy",
+                      "unsupported",
+                      "consent_off",
+                      "revoked",
+                      "core_not_linked",
+                      "no_fresh_data",
+                      "authentication_failed",
+                      "bootstrap_dns_failed",
+                      "bootstrap_network_failed",
+                      "bootstrap_tls_failed",
+                      "dns_failed",
+                      "engine_busy",
+                      "handshake_failed",
+                      "invalid_engine_config",
+                      "invalid_snapshot",
+                      "network_permission_denied",
+                      "no_candidates",
+                      "no_matching_profiles",
+                      "no_working_profile",
+                      "permission_denied",
+                      "permission_revoked",
+                      "probe_failed",
+                      "profile_missing",
+                      "unsupported_transport",
+                      "verification_failed"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "monotonic_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "ipc"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "stage": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "requested",
+                      "admitted",
+                      "refused",
+                      "loading",
+                      "saving",
+                      "starting",
+                      "preparing",
+                      "verifying",
+                      "connected",
+                      "stopping",
+                      "stopped",
+                      "failed",
+                      "cancelled",
+                      "restoring",
+                      "cleaning",
+                      "completed",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "error_code": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "unknown",
+                      "offline",
+                      "timeout",
+                      "cancelled",
+                      "configuration_failed",
+                      "provider_unavailable",
+                      "engine_failed",
+                      "engine_unavailable",
+                      "engine_timeout",
+                      "connection_lost",
+                      "cleanup_timeout",
+                      "invalid_catalog",
+                      "invalid_selection",
+                      "catalog_expired",
+                      "keychain_unavailable",
+                      "packet_io_failed",
+                      "preferences_failed",
+                      "ipc_timeout",
+                      "ipc_invalid",
+                      "memory_pressure",
+                      "network_changed",
+                      "http_error",
+                      "tls_failed",
+                      "storage_failed",
+                      "busy",
+                      "unsupported",
+                      "consent_off",
+                      "revoked",
+                      "core_not_linked",
+                      "no_fresh_data",
+                      "authentication_failed",
+                      "bootstrap_dns_failed",
+                      "bootstrap_network_failed",
+                      "bootstrap_tls_failed",
+                      "dns_failed",
+                      "engine_busy",
+                      "handshake_failed",
+                      "invalid_engine_config",
+                      "invalid_snapshot",
+                      "network_permission_denied",
+                      "no_candidates",
+                      "no_matching_profiles",
+                      "no_working_profile",
+                      "permission_denied",
+                      "permission_revoked",
+                      "probe_failed",
+                      "profile_missing",
+                      "unsupported_transport",
+                      "verification_failed"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "monotonic_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "recovery"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "stage": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "requested",
+                      "admitted",
+                      "refused",
+                      "loading",
+                      "saving",
+                      "starting",
+                      "preparing",
+                      "verifying",
+                      "connected",
+                      "stopping",
+                      "stopped",
+                      "failed",
+                      "cancelled",
+                      "restoring",
+                      "cleaning",
+                      "completed",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "state": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "idle",
+                      "preparing",
+                      "connecting",
+                      "verifying",
+                      "connected",
+                      "switching",
+                      "recovering",
+                      "stopping",
+                      "failed",
+                      "needs_user_action",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "error_code": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "unknown",
+                      "offline",
+                      "timeout",
+                      "cancelled",
+                      "configuration_failed",
+                      "provider_unavailable",
+                      "engine_failed",
+                      "engine_unavailable",
+                      "engine_timeout",
+                      "connection_lost",
+                      "cleanup_timeout",
+                      "invalid_catalog",
+                      "invalid_selection",
+                      "catalog_expired",
+                      "keychain_unavailable",
+                      "packet_io_failed",
+                      "preferences_failed",
+                      "ipc_timeout",
+                      "ipc_invalid",
+                      "memory_pressure",
+                      "network_changed",
+                      "http_error",
+                      "tls_failed",
+                      "storage_failed",
+                      "busy",
+                      "unsupported",
+                      "consent_off",
+                      "revoked",
+                      "core_not_linked",
+                      "no_fresh_data",
+                      "authentication_failed",
+                      "bootstrap_dns_failed",
+                      "bootstrap_network_failed",
+                      "bootstrap_tls_failed",
+                      "dns_failed",
+                      "engine_busy",
+                      "handshake_failed",
+                      "invalid_engine_config",
+                      "invalid_snapshot",
+                      "network_permission_denied",
+                      "no_candidates",
+                      "no_matching_profiles",
+                      "no_working_profile",
+                      "permission_denied",
+                      "permission_revoked",
+                      "probe_failed",
+                      "profile_missing",
+                      "unsupported_transport",
+                      "verification_failed"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "monotonic_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "cleanup"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "stage": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "requested",
+                      "admitted",
+                      "refused",
+                      "loading",
+                      "saving",
+                      "starting",
+                      "preparing",
+                      "verifying",
+                      "connected",
+                      "stopping",
+                      "stopped",
+                      "failed",
+                      "cancelled",
+                      "restoring",
+                      "cleaning",
+                      "completed",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "error_code": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "unknown",
+                      "offline",
+                      "timeout",
+                      "cancelled",
+                      "configuration_failed",
+                      "provider_unavailable",
+                      "engine_failed",
+                      "engine_unavailable",
+                      "engine_timeout",
+                      "connection_lost",
+                      "cleanup_timeout",
+                      "invalid_catalog",
+                      "invalid_selection",
+                      "catalog_expired",
+                      "keychain_unavailable",
+                      "packet_io_failed",
+                      "preferences_failed",
+                      "ipc_timeout",
+                      "ipc_invalid",
+                      "memory_pressure",
+                      "network_changed",
+                      "http_error",
+                      "tls_failed",
+                      "storage_failed",
+                      "busy",
+                      "unsupported",
+                      "consent_off",
+                      "revoked",
+                      "core_not_linked",
+                      "no_fresh_data",
+                      "authentication_failed",
+                      "bootstrap_dns_failed",
+                      "bootstrap_network_failed",
+                      "bootstrap_tls_failed",
+                      "dns_failed",
+                      "engine_busy",
+                      "handshake_failed",
+                      "invalid_engine_config",
+                      "invalid_snapshot",
+                      "network_permission_denied",
+                      "no_candidates",
+                      "no_matching_profiles",
+                      "no_working_profile",
+                      "permission_denied",
+                      "permission_revoked",
+                      "probe_failed",
+                      "profile_missing",
+                      "unsupported_transport",
+                      "verification_failed"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "monotonic_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "provider_stop"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "stop_reason": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "none",
+                      "user_initiated",
+                      "provider_failed",
+                      "no_network_available",
+                      "unrecoverable_network_change",
+                      "provider_disabled",
+                      "authentication_canceled",
+                      "configuration_failed",
+                      "idle_timeout",
+                      "configuration_disabled",
+                      "configuration_removed",
+                      "superseded",
+                      "user_logout",
+                      "user_switch",
+                      "connection_failed",
+                      "sleep",
+                      "app_update",
+                      "internal_error",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "state": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "idle",
+                      "preparing",
+                      "connecting",
+                      "verifying",
+                      "connected",
+                      "switching",
+                      "recovering",
+                      "stopping",
+                      "failed",
+                      "needs_user_action",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "error_code": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "unknown",
+                      "offline",
+                      "timeout",
+                      "cancelled",
+                      "configuration_failed",
+                      "provider_unavailable",
+                      "engine_failed",
+                      "engine_unavailable",
+                      "engine_timeout",
+                      "connection_lost",
+                      "cleanup_timeout",
+                      "invalid_catalog",
+                      "invalid_selection",
+                      "catalog_expired",
+                      "keychain_unavailable",
+                      "packet_io_failed",
+                      "preferences_failed",
+                      "ipc_timeout",
+                      "ipc_invalid",
+                      "memory_pressure",
+                      "network_changed",
+                      "http_error",
+                      "tls_failed",
+                      "storage_failed",
+                      "busy",
+                      "unsupported",
+                      "consent_off",
+                      "revoked",
+                      "core_not_linked",
+                      "no_fresh_data",
+                      "authentication_failed",
+                      "bootstrap_dns_failed",
+                      "bootstrap_network_failed",
+                      "bootstrap_tls_failed",
+                      "dns_failed",
+                      "engine_busy",
+                      "handshake_failed",
+                      "invalid_engine_config",
+                      "invalid_snapshot",
+                      "network_permission_denied",
+                      "no_candidates",
+                      "no_matching_profiles",
+                      "no_working_profile",
+                      "permission_denied",
+                      "permission_revoked",
+                      "probe_failed",
+                      "profile_missing",
+                      "unsupported_transport",
+                      "verification_failed"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "monotonic_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "app_lifecycle"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "lifecycle": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "foreground",
+                      "background"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "monotonic_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "network_change"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "network": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "wifi",
+                      "cellular",
+                      "wired",
+                      "offline",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "monotonic_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "memory_warning"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "memory_rss_bytes": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "memory_footprint_bytes": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "available_memory_bytes": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "monotonic_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "subscription_update"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "stage": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "requested",
+                      "admitted",
+                      "refused",
+                      "loading",
+                      "saving",
+                      "starting",
+                      "preparing",
+                      "verifying",
+                      "connected",
+                      "stopping",
+                      "stopped",
+                      "failed",
+                      "cancelled",
+                      "restoring",
+                      "cleaning",
+                      "completed",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "outcome": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "success",
+                      "failure",
+                      "cancelled",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "error_code": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "unknown",
+                      "offline",
+                      "timeout",
+                      "cancelled",
+                      "configuration_failed",
+                      "provider_unavailable",
+                      "engine_failed",
+                      "engine_unavailable",
+                      "engine_timeout",
+                      "connection_lost",
+                      "cleanup_timeout",
+                      "invalid_catalog",
+                      "invalid_selection",
+                      "catalog_expired",
+                      "keychain_unavailable",
+                      "packet_io_failed",
+                      "preferences_failed",
+                      "ipc_timeout",
+                      "ipc_invalid",
+                      "memory_pressure",
+                      "network_changed",
+                      "http_error",
+                      "tls_failed",
+                      "storage_failed",
+                      "busy",
+                      "unsupported",
+                      "consent_off",
+                      "revoked",
+                      "core_not_linked",
+                      "no_fresh_data",
+                      "authentication_failed",
+                      "bootstrap_dns_failed",
+                      "bootstrap_network_failed",
+                      "bootstrap_tls_failed",
+                      "dns_failed",
+                      "engine_busy",
+                      "handshake_failed",
+                      "invalid_engine_config",
+                      "invalid_snapshot",
+                      "network_permission_denied",
+                      "no_candidates",
+                      "no_matching_profiles",
+                      "no_working_profile",
+                      "permission_denied",
+                      "permission_revoked",
+                      "probe_failed",
+                      "profile_missing",
+                      "unsupported_transport",
+                      "verification_failed"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "count": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "action": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "import",
+                      "refresh"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "phase": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "validation",
+                      "identity",
+                      "transport",
+                      "http",
+                      "device",
+                      "decoding",
+                      "revision",
+                      "persistence",
+                      "policy"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "http_status": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 599
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "duration_ms": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 86400000
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "monotonic_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "ping_result"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "outcome": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "success",
+                      "failure",
+                      "cancelled",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "error_code": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "unknown",
+                      "offline",
+                      "timeout",
+                      "cancelled",
+                      "configuration_failed",
+                      "provider_unavailable",
+                      "engine_failed",
+                      "engine_unavailable",
+                      "engine_timeout",
+                      "connection_lost",
+                      "cleanup_timeout",
+                      "invalid_catalog",
+                      "invalid_selection",
+                      "catalog_expired",
+                      "keychain_unavailable",
+                      "packet_io_failed",
+                      "preferences_failed",
+                      "ipc_timeout",
+                      "ipc_invalid",
+                      "memory_pressure",
+                      "network_changed",
+                      "http_error",
+                      "tls_failed",
+                      "storage_failed",
+                      "busy",
+                      "unsupported",
+                      "consent_off",
+                      "revoked",
+                      "core_not_linked",
+                      "no_fresh_data",
+                      "authentication_failed",
+                      "bootstrap_dns_failed",
+                      "bootstrap_network_failed",
+                      "bootstrap_tls_failed",
+                      "dns_failed",
+                      "engine_busy",
+                      "handshake_failed",
+                      "invalid_engine_config",
+                      "invalid_snapshot",
+                      "network_permission_denied",
+                      "no_candidates",
+                      "no_matching_profiles",
+                      "no_working_profile",
+                      "permission_denied",
+                      "permission_revoked",
+                      "probe_failed",
+                      "profile_missing",
+                      "unsupported_transport",
+                      "verification_failed"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "sample_count": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "success_count": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "failure_count": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "duration_ms": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "mode": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "vpn",
+                      "bypass"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "monotonic_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "heartbeat"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "state": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "idle",
+                      "preparing",
+                      "connecting",
+                      "verifying",
+                      "connected",
+                      "switching",
+                      "recovering",
+                      "stopping",
+                      "failed",
+                      "needs_user_action",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "mode": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "vpn",
+                      "bypass"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "country": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[A-Z]{2}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "engine": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "xray",
+                      "olcrtc",
+                      "openflux",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "transport": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "tcp",
+                      "grpc",
+                      "splithttp",
+                      "hysteria2",
+                      "datachannel",
+                      "cups",
+                      "boards",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "network": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "wifi",
+                      "cellular",
+                      "wired",
+                      "offline",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "bytes_in": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "bytes_out": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "memory_rss_bytes": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "memory_footprint_bytes": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "memory_peak_bytes": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "available_memory_bytes": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "monotonic_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "problem"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "related_session_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                },
+                "maxItems": 8,
+                "uniqueItems": true
+              },
+              "state": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "idle",
+                      "preparing",
+                      "connecting",
+                      "verifying",
+                      "connected",
+                      "switching",
+                      "recovering",
+                      "stopping",
+                      "failed",
+                      "needs_user_action",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "monotonic_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "system_diagnostic"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "diagnostic_kind": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "crash",
+                      "hang",
+                      "cpu_exception",
+                      "disk_write_exception",
+                      "app_launch",
+                      "memory",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "system_api": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "diagnostic_report",
+                      "mx_payload"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "count": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "duration_ms": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "signal": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "exception_code": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "memory_peak_bytes": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "interval_started_at_ms": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "interval_ended_at_ms": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "queue_loss"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "lost_events": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "monotonic_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "historical_report"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "historical": {
+                "const": true,
+                "type": "boolean"
+              },
+              "state": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "idle",
+                      "preparing",
+                      "connecting",
+                      "verifying",
+                      "connected",
+                      "switching",
+                      "recovering",
+                      "stopping",
+                      "failed",
+                      "needs_user_action",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "outcome": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "success",
+                      "failure",
+                      "cancelled",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "stop_reason": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "none",
+                      "user_initiated",
+                      "provider_failed",
+                      "no_network_available",
+                      "unrecoverable_network_change",
+                      "provider_disabled",
+                      "authentication_canceled",
+                      "configuration_failed",
+                      "idle_timeout",
+                      "configuration_disabled",
+                      "configuration_removed",
+                      "superseded",
+                      "user_logout",
+                      "user_switch",
+                      "connection_failed",
+                      "sleep",
+                      "app_update",
+                      "internal_error",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "error_code": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "unknown",
+                      "offline",
+                      "timeout",
+                      "cancelled",
+                      "configuration_failed",
+                      "provider_unavailable",
+                      "engine_failed",
+                      "engine_unavailable",
+                      "engine_timeout",
+                      "connection_lost",
+                      "cleanup_timeout",
+                      "invalid_catalog",
+                      "invalid_selection",
+                      "catalog_expired",
+                      "keychain_unavailable",
+                      "packet_io_failed",
+                      "preferences_failed",
+                      "ipc_timeout",
+                      "ipc_invalid",
+                      "memory_pressure",
+                      "network_changed",
+                      "http_error",
+                      "tls_failed",
+                      "storage_failed",
+                      "busy",
+                      "unsupported",
+                      "consent_off",
+                      "revoked",
+                      "core_not_linked",
+                      "no_fresh_data",
+                      "authentication_failed",
+                      "bootstrap_dns_failed",
+                      "bootstrap_network_failed",
+                      "bootstrap_tls_failed",
+                      "dns_failed",
+                      "engine_busy",
+                      "handshake_failed",
+                      "invalid_engine_config",
+                      "invalid_snapshot",
+                      "network_permission_denied",
+                      "no_candidates",
+                      "no_matching_profiles",
+                      "no_working_profile",
+                      "permission_denied",
+                      "permission_revoked",
+                      "probe_failed",
+                      "profile_missing",
+                      "unsupported_transport",
+                      "verification_failed"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "duration_ms": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "bytes_in": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "bytes_out": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "mode": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "vpn",
+                      "bypass"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "country": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[A-Z]{2}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "engine": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "xray",
+                      "olcrtc",
+                      "openflux",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "transport": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "tcp",
+                      "grpc",
+                      "splithttp",
+                      "hysteria2",
+                      "datachannel",
+                      "cups",
+                      "boards",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "started_at_ms": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "updated_at_ms": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "historical"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "ping_trace"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "stage": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "requested",
+                      "refused",
+                      "admissionStarted",
+                      "admissionAccepted",
+                      "admissionTimeout",
+                      "staleCallback",
+                      "queued",
+                      "factoryStarted",
+                      "factoryReturned",
+                      "profile",
+                      "progress",
+                      "heartbeat",
+                      "cancelRequested",
+                      "invalidated",
+                      "cleanupStarted",
+                      "cleanupFinished",
+                      "completed",
+                      "cancelled",
+                      "failed"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "error_code": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "unknown",
+                      "offline",
+                      "timeout",
+                      "cancelled",
+                      "configuration_failed",
+                      "provider_unavailable",
+                      "engine_failed",
+                      "engine_unavailable",
+                      "engine_timeout",
+                      "connection_lost",
+                      "cleanup_timeout",
+                      "invalid_catalog",
+                      "invalid_selection",
+                      "catalog_expired",
+                      "keychain_unavailable",
+                      "packet_io_failed",
+                      "preferences_failed",
+                      "ipc_timeout",
+                      "ipc_invalid",
+                      "memory_pressure",
+                      "network_changed",
+                      "http_error",
+                      "tls_failed",
+                      "storage_failed",
+                      "busy",
+                      "unsupported",
+                      "consent_off",
+                      "revoked",
+                      "core_not_linked",
+                      "no_fresh_data",
+                      "authentication_failed",
+                      "bootstrap_dns_failed",
+                      "bootstrap_network_failed",
+                      "bootstrap_tls_failed",
+                      "dns_failed",
+                      "engine_busy",
+                      "handshake_failed",
+                      "invalid_engine_config",
+                      "invalid_snapshot",
+                      "network_permission_denied",
+                      "no_candidates",
+                      "no_matching_profiles",
+                      "no_working_profile",
+                      "permission_denied",
+                      "permission_revoked",
+                      "probe_failed",
+                      "profile_missing",
+                      "unsupported_transport",
+                      "verification_failed"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "duration_scope": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "command",
+                      "worker"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "elapsed_ms": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 86400000
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "profile_index": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 32
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "completed": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 32
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "total": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 32
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "result_state": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "pending",
+                      "running",
+                      "measured",
+                      "available",
+                      "reachable",
+                      "skipped",
+                      "failed",
+                      "unsupported",
+                      "cancelled"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "result_kind": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "latency",
+                      "health",
+                      "domain"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "samples": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 3
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "requested_samples": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 3
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "request_ms": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 120000
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "setup_ms": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 120000
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "cancellation": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "user",
+                      "background",
+                      "network",
+                      "route",
+                      "catalog",
+                      "memory",
+                      "unspecified"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "cleanup_confirmed": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "direct_active_vpn": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "skip_bypass": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "network_event": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "created",
+                      "factory_started",
+                      "factory_returned",
+                      "request_started",
+                      "request_verified",
+                      "dns_started",
+                      "dns_finished",
+                      "connect_started",
+                      "connect_finished",
+                      "tls_started",
+                      "tls_finished",
+                      "response_started"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "network_error": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "none",
+                      "cancelled",
+                      "interface",
+                      "refused",
+                      "unreachable",
+                      "reset",
+                      "timeout",
+                      "dns",
+                      "other"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "cleanup_stage": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "native_dns",
+                      "instance"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "cleanup_outcome": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "error",
+                      "timeout"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "cleanup_transport": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "tcp",
+                      "grpc",
+                      "xhttp",
+                      "ws",
+                      "httpupgrade",
+                      "hysteria",
+                      "mixed",
+                      "other",
+                      "unknown"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "dns_started": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "dns_finished": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "dns_failed": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "dns_ipv4": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "dns_ipv6": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "connect_started": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "connect_finished": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "connect_failed": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "tls_started": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "tls_finished": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "tls_failed": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "response_started": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "admission_failure": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "scanBusy",
+                      "cleanupRequired",
+                      "preferencesPending",
+                      "preferencesFailed",
+                      "preferencesTimeout",
+                      "configurationPending",
+                      "vpnTransition",
+                      "ownTunnelUnavailable",
+                      "strictRouting",
+                      "physicalNetworkUnavailable",
+                      "offline",
+                      "unownedTunnel",
+                      "routeChanged",
+                      "activeSessionMissing",
+                      "multipleActiveSessions",
+                      "profileChanged",
+                      "sessionChanged",
+                      "workerBusy",
+                      "coreNotLinked",
+                      "providerSessionUnavailable",
+                      "providerSessionTimeout"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "cleanup_wait_candidates": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "enum": [
+                        "hysteria_close",
+                        "quic_transport_close",
+                        "xhttp_close",
+                        "grpc_close",
+                        "dns_close",
+                        "outbound_close",
+                        "other",
+                        "unknown"
+                      ]
+                    },
+                    "maxItems": 8,
+                    "uniqueItems": true
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "monotonic_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      }
+    }
+  ]
+}

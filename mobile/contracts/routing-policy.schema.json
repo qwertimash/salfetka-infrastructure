@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://salfetka.invalid/schemas/routing-policy-v1",
+  "title": "Salfetka portable routing policy",
+  "description": "Semantic validation requires canonical domain/CIDR, unique rule IDs, bounded expansion and pinned geodata tags. This document is not an engine execution permission.",
+  "$defs": {
+    "routing_matcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "value"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "domain_exact",
+            "domain_suffix",
+            "ip_cidr",
+            "geosite",
+            "geoip"
+          ]
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        }
+      }
+    },
+    "routing_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "action",
+        "match"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "action": {
+          "enum": [
+            "tunnel",
+            "direct"
+          ]
+        },
+        "match": {
+          "$ref": "#/$defs/routing_matcher"
+        }
+      }
+    },
+    "routing_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "default_action",
+        "rules"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+        },
+        "default_action": {
+          "const": "tunnel"
+        },
+        "rules": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/routing_rule"
+          }
+        }
+      }
+    }
+  },
+  "$ref": "#/$defs/routing_policy"
+}

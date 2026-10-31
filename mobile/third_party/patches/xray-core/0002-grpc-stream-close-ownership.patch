@@ -1,0 +1,276 @@
+diff --git a/transport/internet/grpc/dial.go b/transport/internet/grpc/dial.go
+index a7d57ed..fe527a1 100644
+--- a/transport/internet/grpc/dial.go
++++ b/transport/internet/grpc/dial.go
+@@ -56,22 +56,26 @@ func dialgRPC(ctx context.Context, dest net.Destination, streamSettings *interne
+ 		return nil, errors.New("Cannot dial gRPC").Base(err)
+ 	}
+ 	client := encoding.NewGRPCServiceClient(conn)
++	// Own cancellation for this RPC, never for the shared ClientConn or caller.
++	streamCtx, cancel := context.WithCancel(ctx)
+ 	if grpcSettings.MultiMode {
+ 		errors.LogDebug(ctx, "using gRPC multi mode service name: `"+grpcSettings.getServiceName()+"` stream name: `"+grpcSettings.getTunMultiStreamName()+"`")
+-		grpcService, err := client.(encoding.GRPCServiceClientX).TunMultiCustomName(ctx, grpcSettings.getServiceName(), grpcSettings.getTunMultiStreamName())
++		grpcService, err := client.(encoding.GRPCServiceClientX).TunMultiCustomName(streamCtx, grpcSettings.getServiceName(), grpcSettings.getTunMultiStreamName())
+ 		if err != nil {
++			cancel()
+ 			return nil, errors.New("Cannot dial gRPC").Base(err)
+ 		}
+-		return encoding.NewMultiHunkConn(grpcService, nil, nil), nil
++		return encoding.NewMultiHunkConn(grpcService, cancel, nil), nil
+ 	}
+ 
+ 	errors.LogDebug(ctx, "using gRPC tun mode service name: `"+grpcSettings.getServiceName()+"` stream name: `"+grpcSettings.getTunStreamName()+"`")
+-	grpcService, err := client.(encoding.GRPCServiceClientX).TunCustomName(ctx, grpcSettings.getServiceName(), grpcSettings.getTunStreamName())
++	grpcService, err := client.(encoding.GRPCServiceClientX).TunCustomName(streamCtx, grpcSettings.getServiceName(), grpcSettings.getTunStreamName())
+ 	if err != nil {
++		cancel()
+ 		return nil, errors.New("Cannot dial gRPC").Base(err)
+ 	}
+ 
+-	return encoding.NewHunkConn(grpcService, nil, nil), nil
++	return encoding.NewHunkConn(grpcService, cancel, nil), nil
+ }
+ 
+ func getGrpcClient(ctx context.Context, dest net.Destination, streamSettings *internet.MemoryStreamConfig) (*grpc.ClientConn, error) {
+diff --git a/transport/internet/grpc/encoding/hunkconn.go b/transport/internet/grpc/encoding/hunkconn.go
+index 18262fb..57ce9e4 100644
+--- a/transport/internet/grpc/encoding/hunkconn.go
++++ b/transport/internet/grpc/encoding/hunkconn.go
+@@ -3,6 +3,7 @@ package encoding
+ import (
+ 	"context"
+ 	"io"
++	"sync"
+ 
+ 	"github.com/xtls/xray-core/common/buf"
+ 	"github.com/xtls/xray-core/common/errors"
+@@ -24,24 +25,40 @@ type StreamCloser interface {
+ }
+ 
+ type HunkReaderWriter struct {
+-	hc     HunkConn
+-	cancel context.CancelFunc
+-	done   *done.Instance
++	hc        HunkConn
++	cancel    context.CancelFunc
++	done      *done.Instance
++	writeDone *done.Instance
++
++	sendAccess    sync.Mutex
++	closeOnce     sync.Once
++	closeErr      error
++	sendCloseOnce sync.Once
++	sendCloseErr  error
+ 
+ 	buf   []byte
+ 	index int
+ }
+ 
+ func NewHunkReadWriter(hc HunkConn, cancel context.CancelFunc) *HunkReaderWriter {
+-	return &HunkReaderWriter{hc, cancel, done.New(), nil, 0}
++	return &HunkReaderWriter{hc: hc, cancel: cancel, done: done.New(), writeDone: done.New()}
++}
++
++// The CNC writer Close is a write-side EOF; full connection Close remains
++// owned by the reader/onClose HunkReaderWriter. Preserve the existing byte writer.
++type hunkWriteCloser struct {
++	buf.Writer
++	h *HunkReaderWriter
+ }
+ 
++func (w *hunkWriteCloser) Close() error { return w.h.CloseWrite() }
++
+ func NewHunkConn(hc HunkConn, cancel context.CancelFunc, trustedXForwardedFor []string) net.Conn {
+ 	rAddr := remoteAddrFromContext(hc.Context(), trustedXForwardedFor)
+ 	lAddr := localAddrFromContext(hc.Context())
+ 	wrc := NewHunkReadWriter(hc, cancel)
+ 	return cnc.NewConnection(
+-		cnc.ConnectionInput(wrc),
++		cnc.ConnectionInputMulti(&hunkWriteCloser{Writer: buf.NewWriter(wrc), h: wrc}),
+ 		cnc.ConnectionOutput(wrc),
+ 		cnc.ConnectionOnClose(wrc),
+ 		cnc.ConnectionRemoteAddr(rAddr),
+@@ -106,7 +123,15 @@ func (h *HunkReaderWriter) ReadMultiBuffer() (buf.MultiBuffer, error) {
+ }
+ 
+ func (h *HunkReaderWriter) Write(buf []byte) (int, error) {
+-	if h.done.Done() {
++	if h.writeDone.Done() {
++		return 0, io.ErrClosedPipe
++	}
++
++	// gRPC forbids concurrent SendMsg and CloseSend. Close cancels the
++	// owned RPC before waiting for this lock, so flow control cannot deadlock it.
++	h.sendAccess.Lock()
++	defer h.sendAccess.Unlock()
++	if h.writeDone.Done() {
+ 		return 0, io.ErrClosedPipe
+ 	}
+ 
+@@ -117,13 +142,40 @@ func (h *HunkReaderWriter) Write(buf []byte) (int, error) {
+ 	return len(buf), nil
+ }
+ 
+-func (h *HunkReaderWriter) Close() error {
+-	if h.cancel != nil {
+-		h.cancel()
+-	}
+-	if sc, match := h.hc.(StreamCloser); match {
+-		return sc.CloseSend()
++// CloseWrite sends request EOF while preserving the response reader. A blocked
++// Send must finish first; full Close can cancel it without waiting for this lock.
++func (h *HunkReaderWriter) CloseWrite() error {
++	_ = h.writeDone.Close()
++	if _, ok := h.hc.(StreamCloser); !ok {
++		// gRPC server API cannot half-close its send direction independently.
++		return io.ErrClosedPipe
+ 	}
++	return h.closeSend()
++}
++
++func (h *HunkReaderWriter) closeSend() error {
++	h.sendCloseOnce.Do(func() {
++		if sc, ok := h.hc.(StreamCloser); ok {
++			h.sendAccess.Lock()
++			defer h.sendAccess.Unlock()
++			h.sendCloseErr = sc.CloseSend()
++		}
++	})
++	return h.sendCloseErr
++}
+ 
+-	return h.done.Close()
++func (h *HunkReaderWriter) Close() error {
++	h.closeOnce.Do(func() {
++		// Cancel before waiting for Send or an in-progress graceful CloseWrite.
++		_ = h.done.Close()
++		_ = h.writeDone.Close()
++		if h.cancel != nil {
++			h.cancel()
++		}
++		if _, ok := h.hc.(StreamCloser); ok {
++			h.closeErr = h.closeSend()
++		}
++		// Server cancellation lets the handler return and unblocks Send/Recv.
++	})
++	return h.closeErr
+ }
+diff --git a/transport/internet/grpc/encoding/multiconn.go b/transport/internet/grpc/encoding/multiconn.go
+index 5a51c92..6b506f4 100644
+--- a/transport/internet/grpc/encoding/multiconn.go
++++ b/transport/internet/grpc/encoding/multiconn.go
+@@ -3,6 +3,7 @@ package encoding
+ import (
+ 	"context"
+ 	"io"
++	"sync"
+ 
+ 	"github.com/xtls/xray-core/common/buf"
+ 	"github.com/xtls/xray-core/common/errors"
+@@ -20,23 +21,35 @@ type MultiHunkConn interface {
+ }
+ 
+ type MultiHunkReaderWriter struct {
+-	hc     MultiHunkConn
+-	cancel context.CancelFunc
+-	done   *done.Instance
++	hc        MultiHunkConn
++	cancel    context.CancelFunc
++	done      *done.Instance
++	writeDone *done.Instance
++
++	sendAccess    sync.Mutex
++	closeOnce     sync.Once
++	closeErr      error
++	sendCloseOnce sync.Once
++	sendCloseErr  error
+ 
+ 	buf [][]byte
+ }
+ 
+ func NewMultiHunkReadWriter(hc MultiHunkConn, cancel context.CancelFunc) *MultiHunkReaderWriter {
+-	return &MultiHunkReaderWriter{hc, cancel, done.New(), nil}
++	return &MultiHunkReaderWriter{hc: hc, cancel: cancel, done: done.New(), writeDone: done.New()}
+ }
+ 
++// CNC CloseWrite must close only the outbound side, not this RPC's reader.
++type multiHunkWriteCloser struct{ *MultiHunkReaderWriter }
++
++func (w *multiHunkWriteCloser) Close() error { return w.CloseWrite() }
++
+ func NewMultiHunkConn(hc MultiHunkConn, cancel context.CancelFunc, trustedXForwardedFor []string) net.Conn {
+ 	rAddr := remoteAddrFromContext(hc.Context(), trustedXForwardedFor)
+ 	lAddr := localAddrFromContext(hc.Context())
+ 	wrc := NewMultiHunkReadWriter(hc, cancel)
+ 	return cnc.NewConnection(
+-		cnc.ConnectionInputMulti(wrc),
++		cnc.ConnectionInputMulti(&multiHunkWriteCloser{wrc}),
+ 		cnc.ConnectionOutputMulti(wrc),
+ 		cnc.ConnectionOnClose(wrc),
+ 		cnc.ConnectionRemoteAddr(rAddr),
+@@ -90,7 +103,15 @@ func (h *MultiHunkReaderWriter) ReadMultiBuffer() (buf.MultiBuffer, error) {
+ 
+ func (h *MultiHunkReaderWriter) WriteMultiBuffer(mb buf.MultiBuffer) error {
+ 	defer buf.ReleaseMulti(mb)
+-	if h.done.Done() {
++	if h.writeDone.Done() {
++		return io.ErrClosedPipe
++	}
++
++	// gRPC forbids concurrent SendMsg and CloseSend. Close cancels the
++	// owned RPC before waiting for this lock, so flow control cannot deadlock it.
++	h.sendAccess.Lock()
++	defer h.sendAccess.Unlock()
++	if h.writeDone.Done() {
+ 		return io.ErrClosedPipe
+ 	}
+ 
+@@ -109,13 +130,40 @@ func (h *MultiHunkReaderWriter) WriteMultiBuffer(mb buf.MultiBuffer) error {
+ 	return nil
+ }
+ 
+-func (h *MultiHunkReaderWriter) Close() error {
+-	if h.cancel != nil {
+-		h.cancel()
+-	}
+-	if sc, match := h.hc.(StreamCloser); match {
+-		return sc.CloseSend()
++// CloseWrite sends request EOF while preserving the response reader. A blocked
++// Send must finish first; full Close can cancel it without waiting for this lock.
++func (h *MultiHunkReaderWriter) CloseWrite() error {
++	_ = h.writeDone.Close()
++	if _, ok := h.hc.(StreamCloser); !ok {
++		// gRPC server API cannot half-close its send direction independently.
++		return io.ErrClosedPipe
+ 	}
++	return h.closeSend()
++}
++
++func (h *MultiHunkReaderWriter) closeSend() error {
++	h.sendCloseOnce.Do(func() {
++		if sc, ok := h.hc.(StreamCloser); ok {
++			h.sendAccess.Lock()
++			defer h.sendAccess.Unlock()
++			h.sendCloseErr = sc.CloseSend()
++		}
++	})
++	return h.sendCloseErr
++}
+ 
+-	return h.done.Close()
++func (h *MultiHunkReaderWriter) Close() error {
++	h.closeOnce.Do(func() {
++		// Cancel before waiting for Send or an in-progress graceful CloseWrite.
++		_ = h.done.Close()
++		_ = h.writeDone.Close()
++		if h.cancel != nil {
++			h.cancel()
++		}
++		if _, ok := h.hc.(StreamCloser); ok {
++			h.closeErr = h.closeSend()
++		}
++		// Server cancellation lets the handler return and unblocks Send/Recv.
++	})
++	return h.closeErr
+ }

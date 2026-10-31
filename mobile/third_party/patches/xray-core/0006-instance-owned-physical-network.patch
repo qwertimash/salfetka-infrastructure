@@ -1,0 +1,472 @@
+diff --git a/app/dns/dns.go b/app/dns/dns.go
+--- a/app/dns/dns.go
++++ b/app/dns/dns.go
+@@ -166,7 +166,7 @@
+ 
+ 	// If there is no DNS client in config, add a `localhost` DNS client
+ 	if len(clients) == 0 {
+-		clients = append(clients, NewLocalDNSClient(ipOption))
++		clients = append(clients, NewLocalDNSClientWithContext(ctx, ipOption))
+ 	}
+ 
+ 	return &DNS{
+diff --git a/app/dns/nameserver.go b/app/dns/nameserver.go
+--- a/app/dns/nameserver.go
++++ b/app/dns/nameserver.go
+@@ -52,7 +52,7 @@
+ 		}
+ 		switch {
+ 		case strings.EqualFold(u.String(), "localhost"):
+-			return NewLocalNameServer(), nil
++			return NewLocalNameServerWithContext(ctx), nil
+ 		case strings.EqualFold(u.Scheme, "https"): // DNS-over-HTTPS Remote mode
+ 			return NewDoHNameServer(u, dispatcher, false, disableCache, serveStale, serveExpiredTTL, clientIP), nil
+ 		case strings.EqualFold(u.Scheme, "h2c"): // DNS-over-HTTPS h2c Remote mode
+diff --git a/app/dns/nameserver_local.go b/app/dns/nameserver_local.go
+--- a/app/dns/nameserver_local.go
++++ b/app/dns/nameserver_local.go
+@@ -41,9 +41,12 @@
+ 
+ // NewLocalNameServer creates localdns server object for directly lookup in system DNS.
+ func NewLocalNameServer() *LocalNameServer {
++	return NewLocalNameServerWithContext(context.Background())
++}
++func NewLocalNameServerWithContext(ctx context.Context) *LocalNameServer {
+ 	errors.LogInfo(context.Background(), "DNS: created localhost client")
+ 	return &LocalNameServer{
+-		client: localdns.New(),
++		client: localdns.NewWithContext(ctx),
+ 	}
+ }
+ 
+@@ -51,3 +54,7 @@
+ func NewLocalDNSClient(ipOption dns.IPOption) *Client {
+ 	return &Client{server: NewLocalNameServer(), ipOption: &ipOption}
+ }
++
++func NewLocalDNSClientWithContext(ctx context.Context, ipOption dns.IPOption) *Client {
++	return &Client{server: NewLocalNameServerWithContext(ctx), ipOption: &ipOption}
++}
+diff --git a/app/dns/nameserver_quic.go b/app/dns/nameserver_quic.go
+--- a/app/dns/nameserver_quic.go
++++ b/app/dns/nameserver_quic.go
+@@ -16,6 +16,7 @@
+ 	"github.com/xtls/xray-core/common/protocol/dns"
+ 	"github.com/xtls/xray-core/common/session"
+ 	dns_feature "github.com/xtls/xray-core/features/dns"
++	"github.com/xtls/xray-core/transport/internet"
+ 	"github.com/xtls/xray-core/transport/internet/tls"
+ 	"golang.org/x/net/http2"
+ )
+@@ -223,7 +224,7 @@
+ 	}
+ }
+ 
+-func (s *QUICNameServer) getConnection() (*quic.Conn, error) {
++func (s *QUICNameServer) getConnection(ctx context.Context) (*quic.Conn, error) {
+ 	var conn *quic.Conn
+ 	s.RLock()
+ 	conn = s.connection
+@@ -241,14 +242,14 @@
+ 	defer s.Unlock()
+ 
+ 	var err error
+-	conn, err = s.openConnection()
++	conn, err = s.openConnection(ctx)
+ 	if err != nil {
+ 		// This does not look too nice, but QUIC (or maybe quic-go)
+ 		// doesn't seem stable enough.
+ 		// Maybe retransmissions aren't fully implemented in quic-go?
+ 		// Anyways, the simple solution is to make a second try when
+ 		// it fails to open the QUIC connection.
+-		conn, err = s.openConnection()
++		conn, err = s.openConnection(ctx)
+ 		if err != nil {
+ 			return nil, err
+ 		}
+@@ -257,13 +258,36 @@
+ 	return conn, nil
+ }
+ 
+-func (s *QUICNameServer) openConnection() (*quic.Conn, error) {
++func (s *QUICNameServer) openConnection(ctx context.Context) (*quic.Conn, error) {
+ 	tlsConfig := tls.Config{}
+ 	quicConfig := &quic.Config{
+ 		HandshakeIdleTimeout: handshakeTimeout,
+ 	}
+ 	tlsConfig.ServerName = s.destination.Address.String()
+-	conn, err := quic.DialAddr(context.Background(), s.destination.NetAddr(), tlsConfig.GetTLSConfig(tls.WithNextProto("http/1.1", http2.NextProtoTLS, NextProtoDQ)), quicConfig)
++	var conn *quic.Conn
++	var err error
++	secureTLS := tlsConfig.GetTLSConfig(tls.WithNextProto("http/1.1", http2.NextProtoTLS, NextProtoDQ))
++	if internet.SystemNetworkScoped(ctx) {
++		raw, dialErr := internet.DialSystem(ctx, *s.destination, nil)
++		if dialErr != nil {
++			return nil, dialErr
++		}
++		packet, ok := raw.(*internet.PacketConnWrapper)
++		if !ok {
++			raw.Close()
++			return nil, errors.New("bound DNS packet path unavailable")
++		}
++		transport := &quic.Transport{Conn: packet.PacketConn}
++		conn, err = transport.DialEarly(ctx, packet.Dest, secureTLS, quicConfig)
++		if err != nil {
++			transport.Close()
++			packet.Close()
++		} else {
++			context.AfterFunc(conn.Context(), func() { transport.Close(); packet.Close() })
++		}
++	} else {
++		conn, err = quic.DialAddr(context.Background(), s.destination.NetAddr(), secureTLS, quicConfig)
++	}
+ 	log.Record(&log.AccessMessage{
+ 		From:   "DNS",
+ 		To:     s.destination,
+@@ -278,7 +302,7 @@
+ }
+ 
+ func (s *QUICNameServer) openStream(ctx context.Context) (*quic.Stream, error) {
+-	conn, err := s.getConnection()
++	conn, err := s.getConnection(ctx)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+diff --git a/core/context.go b/core/context.go
+--- a/core/context.go
++++ b/core/context.go
+@@ -59,5 +59,5 @@
+ */
+ func ToBackgroundDetachedContext(ctx context.Context) context.Context {
+ 	instance := MustFromContext(ctx)
+-	return toContext(context.Background(), instance)
++	return internet.InheritSystemDialerContext(toContext(context.Background(), instance), ctx)
+ }
+diff --git a/core/xray.go b/core/xray.go
+--- a/core/xray.go
++++ b/core/xray.go
+@@ -213,7 +213,7 @@
+ 		Type     interface{}
+ 		Instance features.Feature
+ 	}{
+-		{dns.ClientType(), localdns.New()},
++		{dns.ClientType(), localdns.NewWithContext(server.ctx)},
+ 		{policy.ManagerType(), policy.DefaultManager{}},
+ 		{routing.RouterType(), routing.DefaultRouter{}},
+ 		{stats.ManagerType(), stats.NoopManager{}},
+diff --git a/features/dns/localdns/client.go b/features/dns/localdns/client.go
+--- a/features/dns/localdns/client.go
++++ b/features/dns/localdns/client.go
+@@ -13,8 +13,10 @@
+ 
+ // Client is an implementation of dns.Client, which queries localhost for DNS.
+ type Client struct {
+-	d *net.Dialer
+-	r *net.Resolver
++	d      *net.Dialer
++	r      *net.Resolver
++	ctx    context.Context
++	scoped bool
+ }
+ 
+ // Type implements common.HasType.
+@@ -32,7 +34,9 @@
+ func (c *Client) LookupIP(host string, option dns.IPOption) ([]net.IP, uint32, error) {
+ 	var ips []net.IP
+ 	var err error
+-	if len(internet.Controllers) > 0 {
++	if c.scoped {
++		ips, err = c.r.LookupIP(c.ctx, "ip", host)
++	} else if len(internet.Controllers) > 0 {
+ 		ips, err = c.r.LookupIP(context.Background(), "ip", host)
+ 	} else {
+ 		ips, err = net.LookupIP(host)
+@@ -76,7 +80,8 @@
+ }
+ 
+ // New create a new dns.Client that queries localhost for DNS.
+-func New() *Client {
++func New() *Client { return NewWithContext(context.Background()) }
++func NewWithContext(ctx context.Context) *Client {
+ 	d := &net.Dialer{
+ 		Timeout: time.Second * 16,
+ 		Control: func(network, address string, c syscall.RawConn) error {
+@@ -101,7 +106,11 @@
+ 		},
+ 	}
+ 
++	if internet.SystemNetworkScoped(ctx) {
++		r = internet.SystemResolver(ctx)
++	}
+ 	return &Client{
++		ctx: ctx, scoped: internet.SystemNetworkScoped(ctx),
+ 		d: d,
+ 		r: r,
+ 	}
+diff --git a/proxy/freedom/freedom.go b/proxy/freedom/freedom.go
+--- a/proxy/freedom/freedom.go
++++ b/proxy/freedom/freedom.go
+@@ -314,7 +314,7 @@
+ 						}
+ 					}
+ 				} else {
+-					addrs, err := net.DefaultResolver.LookupIPAddr(ctx, destination.Address.Domain())
++					addrs, err := internet.SystemResolver(ctx).LookupIPAddr(ctx, destination.Address.Domain())
+ 					if err != nil { // dialer may retry DNS
+ 						errors.LogInfoInner(ctx, err, "failed to get IP address for domain ", destination.Address.Domain())
+ 					}
+@@ -614,7 +614,7 @@
+ 						}
+ 					}
+ 					if shouldUseSystemResolver {
+-						udpAddr, err := net.ResolveUDPAddr("udp", b.UDP.NetAddr())
++						udpAddr, err := internet.ResolveSystemUDPAddr(w.Handler.systemContext, b.UDP.NetAddr())
+ 						if err != nil {
+ 							b.Release()
+ 							continue
+diff --git a/transport/internet/dialer.go b/transport/internet/dialer.go
+--- a/transport/internet/dialer.go
++++ b/transport/internet/dialer.go
+@@ -187,7 +187,7 @@
+ 		if len(parts) != 3 {
+ 			return nil, errors.New("invalid address format", dest.Address.String())
+ 		}
+-		_, srvRecords, err := net.DefaultResolver.LookupSRV(context.Background(), parts[0][1:], parts[1][1:], parts[2])
++		_, srvRecords, err := SystemResolver(ctx).LookupSRV(ctx, parts[0][1:], parts[1][1:], parts[2])
+ 		if err != nil {
+ 			return nil, errors.New("failed to lookup SRV record").Base(err)
+ 		}
+@@ -202,7 +202,7 @@
+ 	}
+ 	if OverrideBy == "txt" {
+ 		errors.LogDebug(ctx, "query TXT record for "+dest.Address.String())
+-		txtRecords, err := net.DefaultResolver.LookupTXT(ctx, dest.Address.String())
++		txtRecords, err := SystemResolver(ctx).LookupTXT(ctx, dest.Address.String())
+ 		if err != nil {
+ 			errors.LogError(ctx, "failed to lookup SRV record: "+err.Error())
+ 			return nil, errors.New("failed to lookup SRV record").Base(err)
+diff --git a/transport/internet/salfetka_system_context.go b/transport/internet/salfetka_system_context.go
+--- a/transport/internet/salfetka_system_context.go
++++ b/transport/internet/salfetka_system_context.go
+@@ -26,5 +26,6 @@
+ 	if provider, ok := source.Value(systemDialerKey{}).(SystemDialerProvider); ok {
+ 		destination = ContextWithSystemDialerProvider(destination, provider)
+ 	}
++	destination = inheritSystemNetworkScope(destination, source)
+ 	return destination
+ }
+diff --git a/transport/internet/system_dialer.go b/transport/internet/system_dialer.go
+--- a/transport/internet/system_dialer.go
++++ b/transport/internet/system_dialer.go
+@@ -50,7 +50,7 @@
+ 	errors.LogDebug(ctx, "dialing to "+dest.String())
+ 
+ 	if dest.Network == net.Network_UDP {
+-		destAddr, err := net.ResolveUDPAddr("udp", dest.NetAddr())
++		destAddr, err := ResolveSystemUDPAddr(ctx, dest.NetAddr())
+ 		if err != nil {
+ 			return nil, err
+ 		}
+@@ -74,13 +74,17 @@
+ 					errors.LogInfoInner(ctx, err, "failed to apply external controller")
+ 				}
+ 			}
+-			return c.Control(func(fd uintptr) {
++			err := c.Control(func(fd uintptr) {
+ 				if sockopt != nil {
+ 					if err := applyOutboundSocketOptions(network, destAddr.String(), fd, sockopt); err != nil {
+ 						errors.LogInfo(ctx, err, "failed to apply socket options")
+ 					}
+ 				}
+ 			})
++			if err != nil {
++				return err
++			}
++			return applySystemNetworkControl(ctx, network, address, c)
+ 		}
+ 		packetConn, err := lc.ListenPacket(ctx, srcAddr.Network(), srcAddr.String())
+ 		if err != nil {
+@@ -116,12 +120,13 @@
+ 	}
+ 	dialer := &net.Dialer{
+ 		Timeout:         time.Second * 16,
++		Resolver:        SystemResolver(ctx),
+ 		LocalAddr:       resolveSrcAddr(dest.Network, src),
+ 		KeepAlive:       keepAlive,
+ 		KeepAliveConfig: keepAliveConfig,
+ 	}
+ 
+-	if sockopt != nil || len(Controllers) > 0 {
++	if sockopt != nil || len(Controllers) > 0 || SystemNetworkScoped(ctx) {
+ 		if sockopt != nil && sockopt.TcpMptcp {
+ 			dialer.SetMultipathTCP(true)
+ 		}
+@@ -131,13 +136,17 @@
+ 					errors.LogInfoInner(ctx, err, "failed to apply external controller")
+ 				}
+ 			}
+-			return c.Control(func(fd uintptr) {
++			err := c.Control(func(fd uintptr) {
+ 				if sockopt != nil {
+ 					if err := applyOutboundSocketOptions(network, address, fd, sockopt); err != nil {
+ 						errors.LogInfoInner(ctx, err, "failed to apply socket options")
+ 					}
+ 				}
+ 			})
++			if err != nil {
++				return err
++			}
++			return applySystemNetworkControl(ctx, network, address, c)
+ 		}
+ 	}
+ 
+diff --git a/transport/internet/salfetka_network_context.go b/transport/internet/salfetka_network_context.go
+new file mode 100644
+--- /dev/null
++++ b/transport/internet/salfetka_network_context.go
+@@ -0,0 +1,76 @@
++package internet
++
++import (
++	"context"
++	"fmt"
++	"github.com/xtls/xray-core/common/net"
++	"strconv"
++	"syscall"
++)
++
++type systemNetworkKey struct{}
++type systemNetworkScope struct {
++	control  func(string, string, syscall.RawConn) error
++	resolver *net.Resolver
++}
++
++// Only the trusted app host supplies these functions. Config JSON cannot opt
++// into a socket binding or replace the source's DNS/routing configuration.
++func ContextWithSystemNetworkScope(ctx context.Context, control func(string, string, syscall.RawConn) error, resolver *net.Resolver) context.Context {
++	return context.WithValue(ctx, systemNetworkKey{}, systemNetworkScope{control, resolver})
++}
++func SystemNetworkScoped(ctx context.Context) bool {
++	_, ok := ctx.Value(systemNetworkKey{}).(systemNetworkScope)
++	return ok
++}
++func SystemResolver(ctx context.Context) *net.Resolver {
++	if scope, ok := ctx.Value(systemNetworkKey{}).(systemNetworkScope); ok {
++		if scope.control == nil || scope.resolver == nil {
++			// A malformed host scope must not panic or select the OS resolver.
++			return &net.Resolver{PreferGo: true, StrictErrors: true, Dial: func(context.Context, string, string) (net.Conn, error) {
++				return nil, fmt.Errorf("measurement network scope unavailable")
++			}}
++		}
++		return scope.resolver
++	}
++	return net.DefaultResolver
++}
++func applySystemNetworkControl(ctx context.Context, network, address string, raw syscall.RawConn) error {
++	if scope, ok := ctx.Value(systemNetworkKey{}).(systemNetworkScope); ok {
++		if scope.control == nil || scope.resolver == nil {
++			return fmt.Errorf("measurement network scope unavailable")
++		}
++		return scope.control(network, address, raw)
++	}
++	return nil
++}
++func inheritSystemNetworkScope(destination, source context.Context) context.Context {
++	if scope, ok := source.Value(systemNetworkKey{}).(systemNetworkScope); ok {
++		return context.WithValue(destination, systemNetworkKey{}, scope)
++	}
++	return destination
++}
++func ResolveSystemUDPAddr(ctx context.Context, address string) (*net.UDPAddr, error) {
++	if !SystemNetworkScoped(ctx) {
++		return net.ResolveUDPAddr("udp", address)
++	}
++	host, port, err := net.SplitHostPort(address)
++	if err != nil {
++		return nil, err
++	}
++	number, err := strconv.Atoi(port)
++	if err != nil || number < 0 || number > 65535 {
++		return nil, fmt.Errorf("invalid UDP port")
++	}
++	if ip := net.ParseIP(host); ip != nil {
++		return &net.UDPAddr{IP: ip, Port: number}, nil
++	}
++	ips, err := SystemResolver(ctx).LookupIPAddr(ctx, host)
++	if err != nil {
++		return nil, err
++	}
++	if len(ips) == 0 {
++		return nil, fmt.Errorf("empty bound resolver response")
++	}
++	return &net.UDPAddr{IP: ips[0].IP, Port: number, Zone: ips[0].Zone}, nil
++}
+diff --git a/transport/internet/salfetka_network_context_test.go b/transport/internet/salfetka_network_context_test.go
+new file mode 100644
+--- /dev/null
++++ b/transport/internet/salfetka_network_context_test.go
+@@ -0,0 +1,64 @@
++package internet
++
++import (
++	"context"
++	"errors"
++	"github.com/xtls/xray-core/common/net"
++	"sync/atomic"
++	"syscall"
++	"testing"
++	"time"
++)
++
++func TestSalfetkaPhysicalScopeFailClosedTCPAndUDP(t *testing.T) {
++	blocked := errors.New("synthetic interface bind rejected")
++	var controls atomic.Int32
++	resolver := &net.Resolver{PreferGo: true, StrictErrors: true, Dial: func(context.Context, string, string) (net.Conn, error) { return nil, blocked }}
++	scope := ContextWithSystemNetworkScope(context.Background(), func(string, string, syscall.RawConn) error { controls.Add(1); return blocked }, resolver)
++	ctx, cancel := context.WithTimeout(InheritSystemDialerContext(context.Background(), scope), time.Second)
++	defer cancel()
++	for _, address := range []string{"127.0.0.1", "::1"} {
++		for _, network := range []net.Network{net.Network_TCP, net.Network_UDP} {
++			dest := net.Destination{Address: net.ParseAddress(address), Port: net.Port(1), Network: network}
++			connection, err := (&DefaultSystemDialer{}).Dial(ctx, nil, dest, nil)
++			if connection != nil {
++				connection.Close()
++				t.Fatal("binding failure opened socket")
++			}
++			if !errors.Is(err, blocked) {
++				t.Fatal("binding error not returned", address, network, err)
++			}
++		}
++	}
++	if controls.Load() != 4 {
++		t.Fatal("some TCP/UDP sockets skipped binding", controls.Load())
++	}
++}
++
++func TestSalfetkaPhysicalScopeDNSInheritanceAndMalformedNoFallback(t *testing.T) {
++	blocked := errors.New("synthetic scoped DNS unavailable")
++	var queries atomic.Int32
++	r := &net.Resolver{PreferGo: true, StrictErrors: true, Dial: func(context.Context, string, string) (net.Conn, error) { queries.Add(1); return nil, blocked }}
++	control := func(string, string, syscall.RawConn) error { return nil }
++	scope := ContextWithSystemNetworkScope(context.Background(), control, r)
++	ctx, cancel := context.WithTimeout(InheritSystemDialerContext(context.Background(), scope), time.Second)
++	defer cancel()
++	if !SystemNetworkScoped(ctx) || SystemResolver(ctx) != r {
++		t.Fatal("detached transport lost owned resolver")
++	}
++	if _, err := ResolveSystemUDPAddr(ctx, "synthetic-measure.test:53"); err == nil || queries.Load() == 0 {
++		t.Fatal("UDP bootstrap ignored scoped DNS", err)
++	}
++	if _, err := (&DefaultSystemDialer{}).Dial(ctx, nil, net.TCPDestination(net.DomainAddress("synthetic-measure.test"), 1), nil); err == nil {
++		t.Fatal("TCP bootstrap ignored scoped DNS")
++	}
++	for _, malformed := range []context.Context{ContextWithSystemNetworkScope(ctx, nil, r), ContextWithSystemNetworkScope(ctx, control, nil)} {
++		before := queries.Load()
++		if _, err := ResolveSystemUDPAddr(malformed, "synthetic-measure.test:53"); err == nil {
++			t.Fatal("malformed scope fell back DNS")
++		}
++		if queries.Load() != before {
++			t.Fatal("malformed scope used otherwise valid resolver")
++		}
++	}
++}

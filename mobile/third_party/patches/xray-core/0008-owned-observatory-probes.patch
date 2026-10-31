@@ -1,0 +1,525 @@
+diff --git a/app/observatory/observer.go b/app/observatory/observer.go
+--- a/app/observatory/observer.go
++++ b/app/observatory/observer.go
+@@ -2,6 +2,7 @@
+ 
+ import (
+ 	"context"
++	"crypto/tls"
+ 	"net"
+ 	"net/http"
+ 	"net/url"
+@@ -15,7 +16,6 @@
+ 	v2net "github.com/xtls/xray-core/common/net"
+ 	"github.com/xtls/xray-core/common/session"
+ 	"github.com/xtls/xray-core/common/signal/done"
+-	"github.com/xtls/xray-core/common/task"
+ 	"github.com/xtls/xray-core/common/utils"
+ 	"github.com/xtls/xray-core/core"
+ 	"github.com/xtls/xray-core/features/extension"
+@@ -26,8 +26,12 @@
+ )
+ 
+ type Observer struct {
+-	config *Config
+-	ctx    context.Context
++	config         *Config
++	ctx            context.Context
++	cancelProbe    context.CancelFunc
++	lifetimeMu     sync.Mutex
++	lifetimeClosed bool
++	lifetimeTasks  sync.WaitGroup
+ 
+ 	statusLock sync.Mutex
+ 	status     []*OutboundStatus
+@@ -51,22 +55,50 @@
+ }
+ 
+ func (o *Observer) Start() error {
+-	if o.config != nil && len(o.config.SubjectSelector) != 0 {
++	o.lifetimeMu.Lock()
++	defer o.lifetimeMu.Unlock()
++	if o.lifetimeClosed {
++		return context.Canceled
++	}
++	if o.config != nil && len(o.config.SubjectSelector) != 0 && o.finished == nil {
+ 		o.finished = done.New()
+-		go o.background()
++		o.lifetimeTasks.Add(1)
++		go func() { defer o.lifetimeTasks.Done(); o.background() }()
+ 	}
+ 	return nil
+ }
+ 
+ func (o *Observer) Close() error {
+-	if o.finished != nil {
+-		return o.finished.Close()
+-	}
++	o.lifetimeMu.Lock()
++	o.lifetimeClosed = true
++	finished, cancel := o.finished, o.cancelProbe
++	o.lifetimeMu.Unlock()
++	if finished != nil {
++		_ = finished.Close()
++	}
++	if cancel != nil {
++		cancel()
++	}
++	// The closed fence prevents new task registration before this wait.
++	o.lifetimeTasks.Wait()
+ 	return nil
+ }
+ 
++func (o *Observer) waitProbeInterval(interval time.Duration) bool {
++	timer := time.NewTimer(interval)
++	defer timer.Stop()
++	select {
++	case <-timer.C:
++		return true
++	case <-o.ctx.Done():
++		return false
++	case <-o.finished.Wait():
++		return false
++	}
++}
++
+ func (o *Observer) background() {
+-	for !o.finished.Done() {
++	for !o.finished.Done() && o.ctx.Err() == nil {
+ 		hs, ok := o.ohm.(outbound.HandlerSelector)
+ 		if !ok {
+ 			errors.LogInfo(o.ctx, "outbound.Manager is not a HandlerSelector")
+@@ -84,7 +116,9 @@
+ 
+ 		if len(outbounds) == 0 {
+ 			errors.LogWarning(o.ctx, "no outbound matches subjectSelector ", o.config.SubjectSelector)
+-			time.Sleep(sleepTime)
++			if !o.waitProbeInterval(sleepTime) {
++				return
++			}
+ 			continue
+ 		}
+ 
+@@ -96,7 +130,9 @@
+ 				if o.finished.Done() {
+ 					return
+ 				}
+-				time.Sleep(sleepTime)
++				if !o.waitProbeInterval(sleepTime) {
++					return
++				}
+ 			}
+ 			continue
+ 		}
+@@ -118,7 +154,9 @@
+ 				return
+ 			}
+ 		}
+-		time.Sleep(sleepTime)
++		if !o.waitProbeInterval(sleepTime) {
++			return
++		}
+ 	}
+ }
+ 
+@@ -138,51 +176,62 @@
+ }
+ 
+ func (o *Observer) probe(outbound string) ProbeResult {
++	return o.probeWithTLSConfig(outbound, nil)
++}
++
++// TLS roots are injected only by same-package loopback tests. Production uses
++// system trust, and no configuration field can supply this parameter.
++func (o *Observer) probeWithTLSConfig(outbound string, tlsConfig *tls.Config) ProbeResult {
++	o.lifetimeMu.Lock()
++	if o.lifetimeClosed {
++		o.lifetimeMu.Unlock()
++		return ProbeResult{Alive: false, LastErrorReason: "observer closed"}
++	}
++	o.lifetimeTasks.Add(1)
++	o.lifetimeMu.Unlock()
++	defer o.lifetimeTasks.Done()
++	probeCtx, cancel := context.WithTimeout(o.ctx, 5*time.Second)
++	defer cancel()
+ 	errorCollectorForRequest := newErrorCollector()
+-
+ 	httpTransport := http.Transport{
+-		Proxy: func(*http.Request) (*url.URL, error) {
+-			return nil, nil
+-		},
++		Proxy: func(*http.Request) (*url.URL, error) { return nil, nil },
+ 		DialContext: func(ctx context.Context, network string, addr string) (net.Conn, error) {
+-			var connection net.Conn
+-			taskErr := task.Run(ctx, func() error {
+-				// MUST use Xray's built in context system
+-				dest, err := v2net.ParseDestination(network + ":" + addr)
+-				if err != nil {
+-					return errors.New("cannot understand address").Base(err)
+-				}
+-				trackedCtx := session.TrackedConnectionError(o.ctx, errorCollectorForRequest)
+-				conn, err := tagged.Dialer(trackedCtx, o.dispatcher, dest, outbound)
+-				if err != nil {
+-					return errors.New("cannot dial remote address ", dest).Base(err)
+-				}
+-				connection = conn
+-				return nil
+-			})
+-			if taskErr != nil {
+-				return nil, errors.New("cannot finish connection").Base(taskErr)
+-			}
+-			return connection, nil
++			dest, err := v2net.ParseDestination(network + ":" + addr)
++			if err != nil {
++				return nil, errors.New("cannot understand address").Base(err)
++			}
++			// Preserve the owning instance, DNS/routing/network scope and the
++			// whole probe's cancellation rather than an unbounded owner ctx.
++			trackedCtx := session.TrackedConnectionError(probeCtx, errorCollectorForRequest)
++			conn, err := tagged.Dialer(trackedCtx, o.dispatcher, dest, outbound)
++			if err != nil {
++				return nil, errors.New("cannot dial remote address ", dest).Base(err)
++			}
++			return conn, nil
+ 		},
+ 		TLSHandshakeTimeout: time.Second * 5,
+-	}
++		TLSClientConfig:     tlsConfig,
++	}
++	// A fresh pool is created for every native observation. A successful 204
++	// otherwise leaves its keep-alive socket alive in an abandoned pool.
++	defer httpTransport.CloseIdleConnections()
+ 	httpClient := &http.Client{
+-		Transport: &httpTransport,
+-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+-			return http.ErrUseLastResponse
+-		},
+-		Jar:     nil,
+-		Timeout: time.Second * 5,
++		Transport:     &httpTransport,
++		CheckRedirect: func(req *http.Request, via []*http.Request) error { return http.ErrUseLastResponse },
++		Jar:           nil,
++		Timeout:       time.Second * 5,
+ 	}
+ 	var GETTime time.Duration
+-	err := task.Run(o.ctx, func() error {
++	err := func() error {
+ 		startTime := time.Now()
+ 		probeURL := "https://www.google.com/generate_204"
+ 		if o.config.ProbeUrl != "" {
+ 			probeURL = o.config.ProbeUrl
+ 		}
+-		req, _ := http.NewRequest(http.MethodGet, probeURL, nil)
++		req, err := http.NewRequestWithContext(probeCtx, http.MethodGet, probeURL, nil)
++		if err != nil {
++			return errors.New("cannot create probe request").Base(err)
++		}
+ 		utils.TryDefaultHeadersWith(req.Header, "nav")
+ 		response, err := httpClient.Do(req)
+ 		if err != nil {
+@@ -191,10 +240,9 @@
+ 		if response.Body != nil {
+ 			response.Body.Close()
+ 		}
+-		endTime := time.Now()
+-		GETTime = endTime.Sub(startTime)
++		GETTime = time.Since(startTime)
+ 		return nil
+-	})
++	}()
+ 	if err != nil {
+ 		errorMessage := "the outbound " + outbound + " is dead: GET request failed:" + err.Error() + "with outbound handler report underlying connection failed"
+ 		errors.LogInfoInner(o.ctx, errorCollectorForRequest.UnderlyingError(), errorMessage)
+@@ -247,11 +295,13 @@
+ 	if err != nil {
+ 		return nil, errors.New("Cannot get depended features").Base(err)
+ 	}
++	ctx, cancel := context.WithCancel(ctx)
+ 	return &Observer{
+-		config:     config,
+-		ctx:        ctx,
+-		ohm:        outboundManager,
+-		dispatcher: dispatcher,
++		config:      config,
++		ctx:         ctx,
++		cancelProbe: cancel,
++		ohm:         outboundManager,
++		dispatcher:  dispatcher,
+ 	}, nil
+ }
+ 
+diff --git a/app/observatory/salfetka_probe_lifecycle_test.go b/app/observatory/salfetka_probe_lifecycle_test.go
+new file mode 100644
+--- /dev/null
++++ b/app/observatory/salfetka_probe_lifecycle_test.go
+@@ -0,0 +1,270 @@
++package observatory
++
++import (
++	"context"
++	"crypto/tls"
++	"crypto/x509"
++	"fmt"
++	"net"
++	"net/http"
++	"net/http/httptest"
++	"sync"
++	"sync/atomic"
++	"testing"
++	"time"
++
++	"github.com/xtls/xray-core/common/buf"
++	xnet "github.com/xtls/xray-core/common/net"
++	"github.com/xtls/xray-core/common/session"
++	"github.com/xtls/xray-core/core"
++	"github.com/xtls/xray-core/features/routing"
++	"github.com/xtls/xray-core/transport"
++	_ "github.com/xtls/xray-core/transport/internet/tagged/taggedimpl"
++)
++
++// Actual Observer.probe HTTP/TLS code runs over the standard tagged dispatcher.
++// Only the trusted test root and a literal loopback dispatcher are injected.
++// No system roots, provider hosts or production configuration are modified.
++type probeLifecycleFixture struct {
++	server     *httptest.Server
++	tls        *tls.Config
++	sockets    atomic.Int32
++	handshakes atomic.Int32
++	badSNI     atomic.Bool
++	requests   atomic.Int32
++	held       sync.Map
++}
++
++type probeHeldRequest struct {
++	started chan struct{}
++	ended   chan struct{}
++	once    sync.Once
++}
++
++func newProbeLifecycleFixture(t *testing.T) *probeLifecycleFixture {
++	t.Helper()
++	f := &probeLifecycleFixture{}
++	f.server = httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		f.requests.Add(1)
++		if item, exists := f.held.Load(r.URL.Path); exists {
++			h := item.(*probeHeldRequest)
++			h.once.Do(func() { close(h.started) })
++			<-r.Context().Done()
++			close(h.ended)
++			return
++		}
++		w.WriteHeader(http.StatusNoContent)
++	}))
++	f.server.Config.ConnState = func(_ net.Conn, state http.ConnState) {
++		if state == http.StateNew {
++			f.sockets.Add(1)
++		}
++		if state == http.StateClosed {
++			f.sockets.Add(-1)
++		}
++	}
++	f.server.TLS = &tls.Config{NextProtos: []string{"http/1.1"}, GetConfigForClient: func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
++		f.handshakes.Add(1)
++		if hello.ServerName != "example.com" {
++			f.badSNI.Store(true)
++		}
++		return nil, nil
++	}}
++	f.server.StartTLS()
++	roots := x509.NewCertPool()
++	roots.AddCert(f.server.Certificate())
++	f.tls = &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12}
++	t.Cleanup(f.server.Close)
++	return f
++}
++
++func (f *probeLifecycleFixture) hold(path string) *probeHeldRequest {
++	h := &probeHeldRequest{started: make(chan struct{}), ended: make(chan struct{})}
++	f.held.Store(path, h)
++	return h
++}
++func (f *probeLifecycleFixture) observer(t *testing.T, parent context.Context, path string) *Observer {
++	t.Helper()
++	owner, cancel := context.WithCancel(parent)
++	t.Cleanup(cancel)
++	_, port, _ := net.SplitHostPort(f.server.Listener.Addr().String())
++	ctx := context.WithValue(owner, core.XrayKey(1), &core.Instance{})
++	return &Observer{ctx: ctx, cancelProbe: cancel, config: &Config{ProbeUrl: "https://example.com:" + port + path}, dispatcher: &probeLoopbackDispatcher{address: f.server.Listener.Addr().String()}}
++}
++func waitProbeSockets(t *testing.T, f *probeLifecycleFixture, expected int32) {
++	t.Helper()
++	limit := time.Now().Add(time.Second)
++	for time.Now().Before(limit) {
++		if f.sockets.Load() == expected {
++			return
++		}
++		time.Sleep(time.Millisecond)
++	}
++	t.Fatalf("retained probe sockets: got %d want %d", f.sockets.Load(), expected)
++}
++func waitProbeEvent(t *testing.T, event <-chan struct{}, label string) {
++	t.Helper()
++	select {
++	case <-event:
++	case <-time.After(time.Second):
++		t.Fatal(label)
++	}
++}
++
++type probeLoopbackDispatcher struct{ address string }
++
++func (*probeLoopbackDispatcher) Type() any    { return routing.DispatcherType() }
++func (*probeLoopbackDispatcher) Start() error { return nil }
++func (*probeLoopbackDispatcher) Close() error { return nil }
++func (*probeLoopbackDispatcher) DispatchLink(context.Context, xnet.Destination, *transport.Link) error {
++	return fmt.Errorf("unused synthetic DispatchLink")
++}
++func (d *probeLoopbackDispatcher) Dispatch(ctx context.Context, dest xnet.Destination) (*transport.Link, error) {
++	if dest.Address.String() != "example.com" || session.GetForcedOutboundTagFromContext(ctx) != "proxy-owner" {
++		return nil, fmt.Errorf("tag or destination changed")
++	}
++	raw, err := (&net.Dialer{}).DialContext(ctx, "tcp", d.address)
++	if err != nil {
++		return nil, err
++	}
++	c := &probeOwnedLink{conn: raw}
++	c.reader = buf.NewReader(raw)
++	c.writer = buf.NewWriter(raw)
++	c.stop = context.AfterFunc(ctx, func() { _ = raw.Close() })
++	return &transport.Link{Reader: c, Writer: c}, nil
++}
++
++type probeOwnedLink struct {
++	conn   net.Conn
++	reader buf.Reader
++	writer buf.Writer
++	stop   func() bool
++	once   sync.Once
++}
++
++func (c *probeOwnedLink) ReadMultiBuffer() (buf.MultiBuffer, error) {
++	return c.reader.ReadMultiBuffer()
++}
++func (c *probeOwnedLink) WriteMultiBuffer(b buf.MultiBuffer) error {
++	return c.writer.WriteMultiBuffer(b)
++}
++func (c *probeOwnedLink) Close() error {
++	c.once.Do(func() { c.stop(); _ = c.conn.Close() })
++	return nil
++}
++func (c *probeOwnedLink) Interrupt() { _ = c.Close() }
++
++func TestSalfetkaRepeatedActualObserverProbesReleaseOwnSockets(t *testing.T) {
++	f := newProbeLifecycleFixture(t)
++	o := f.observer(t, context.Background(), "/generate_204")
++	for range 12 {
++		if result := o.probeWithTLSConfig("proxy-owner", f.tls); !result.Alive {
++			t.Fatal("strict TLS probe failed", result.LastErrorReason)
++		}
++	}
++	waitProbeSockets(t, f, 0)
++	if f.requests.Load() != 12 || f.handshakes.Load() != 12 || f.badSNI.Load() {
++		t.Fatal("TLS/SNI or probe count not preserved")
++	}
++}
++
++func TestSalfetkaObserverCloseCancelsOnlyItsPendingProbe(t *testing.T) {
++	f := newProbeLifecycleFixture(t)
++	a, b := f.hold("/hold-a"), f.hold("/hold-b")
++	first := f.observer(t, context.Background(), "/hold-a")
++	foreign := f.observer(t, context.Background(), "/hold-b")
++	firstDone, foreignDone := make(chan struct{}), make(chan struct{})
++	go func() { first.probeWithTLSConfig("proxy-owner", f.tls); close(firstDone) }()
++	go func() { foreign.probeWithTLSConfig("proxy-owner", f.tls); close(foreignDone) }()
++	waitProbeEvent(t, a.started, "first request did not start")
++	waitProbeEvent(t, b.started, "foreign request did not start")
++	closed := make(chan error, 1)
++	go func() { closed <- first.Close() }()
++	select {
++	case err := <-closed:
++		if err != nil {
++			t.Fatal(err)
++		}
++	case <-time.After(time.Second):
++		t.Fatal("Close did not drain its request")
++	}
++	waitProbeEvent(t, firstDone, "Close returned while owned probe still ran")
++	waitProbeEvent(t, a.ended, "Close left owned TLS request/socket alive")
++	select {
++	case <-foreignDone:
++		t.Fatal("Close interrupted another observer")
++	default:
++	}
++	waitProbeSockets(t, f, 1)
++	if result := first.probeWithTLSConfig("proxy-owner", f.tls); result.Alive {
++		t.Fatal("closed observer admitted a late probe")
++	}
++	if err := foreign.Close(); err != nil {
++		t.Fatal(err)
++	}
++	waitProbeEvent(t, foreignDone, "foreign cleanup did not finish")
++	waitProbeSockets(t, f, 0)
++}
++
++func TestSalfetkaObserverParentCancelDrainsPendingTLSRequest(t *testing.T) {
++	f := newProbeLifecycleFixture(t)
++	hold := f.hold("/hold-parent")
++	ctx, cancel := context.WithCancel(context.Background())
++	defer cancel()
++	o := f.observer(t, ctx, "/hold-parent")
++	done := make(chan struct{})
++	go func() { o.probeWithTLSConfig("proxy-owner", f.tls); close(done) }()
++	waitProbeEvent(t, hold.started, "request did not start")
++	cancel()
++	waitProbeEvent(t, done, "owner cancellation did not interrupt probe")
++	waitProbeEvent(t, hold.ended, "owner cancellation did not release TLS request")
++	waitProbeSockets(t, f, 0)
++}
++
++func TestSalfetkaObserverProbeRejectsUntrustedTLS(t *testing.T) {
++	f := newProbeLifecycleFixture(t)
++	o := f.observer(t, context.Background(), "/generate_204")
++	untrusted := f.tls.Clone()
++	untrusted.RootCAs = x509.NewCertPool()
++	if result := o.probeWithTLSConfig("proxy-owner", untrusted); result.Alive {
++		t.Fatal("untrusted TLS probe reported alive")
++	}
++	waitProbeSockets(t, f, 0)
++	if f.requests.Load() != 0 || f.handshakes.Load() != 1 || f.badSNI.Load() {
++		t.Fatal("TLS trust/SNI negative check did not execute")
++	}
++	if err := o.Close(); err != nil {
++		t.Fatal(err)
++	}
++}
++
++func TestSalfetkaObserverConcurrentCloseIsIdempotentAndFencesRestart(t *testing.T) {
++	f := newProbeLifecycleFixture(t)
++	held := f.hold("/concurrent-close")
++	o := f.observer(t, context.Background(), "/concurrent-close")
++	probeDone := make(chan struct{})
++	go func() { o.probeWithTLSConfig("proxy-owner", f.tls); close(probeDone) }()
++	waitProbeEvent(t, held.started, "probe did not start")
++	results := make(chan error, 8)
++	for range 8 {
++		go func() { results <- o.Close() }()
++	}
++	for range 8 {
++		select {
++		case err := <-results:
++			if err != nil {
++				t.Fatal(err)
++			}
++		case <-time.After(time.Second):
++			t.Fatal("concurrent Close blocked")
++		}
++	}
++	waitProbeEvent(t, probeDone, "Close did not drain probe")
++	waitProbeSockets(t, f, 0)
++	if err := o.Start(); err != context.Canceled {
++		t.Fatal("closed feature restarted", err)
++	}
++	if o.finished != nil {
++		t.Fatal("closed feature allocated a background runner")
++	}
++}

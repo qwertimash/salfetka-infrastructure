@@ -1,0 +1,195 @@
+diff --git a/features/dns/localdns/client.go b/features/dns/localdns/client.go
+--- a/features/dns/localdns/client.go
++++ b/features/dns/localdns/client.go
+@@ -35,7 +35,19 @@
+ 	var ips []net.IP
+ 	var err error
+ 	if c.scoped {
+-		ips, err = c.r.LookupIP(c.ctx, "ip", host)
++		// Enforce the requested families before lookup. Filtering afterwards
++		// still lets an unused family's DNS failure delay or abort this request.
++		network := "ip"
++		switch {
++		case option.IPv4Enable && option.IPv6Enable:
++		case option.IPv4Enable:
++			network = "ip4"
++		case option.IPv6Enable:
++			network = "ip6"
++		default:
++			return nil, 0, dns.ErrEmptyResponse
++		}
++		ips, err = c.r.LookupIP(c.ctx, network, host)
+ 	} else if len(internet.Controllers) > 0 {
+ 		ips, err = c.r.LookupIP(context.Background(), "ip", host)
+ 	} else {
+diff --git a/features/dns/localdns/salfetka_scoped_family_test.go b/features/dns/localdns/salfetka_scoped_family_test.go
+new file mode 100644
+--- /dev/null
++++ b/features/dns/localdns/salfetka_scoped_family_test.go
+@@ -0,0 +1,166 @@
++package localdns
++
++import (
++	"context"
++	"net"
++	"strings"
++	"sync/atomic"
++	"syscall"
++	"testing"
++	"time"
++
++	"github.com/xtls/xray-core/features/dns"
++	"github.com/xtls/xray-core/transport/internet"
++	"golang.org/x/net/dns/dnsmessage"
++)
++
++func TestSalfetkaScopedLookupRequestsOnlyEnabledFamilies(t *testing.T) {
++	for _, test := range []struct {
++		name   string
++		option dns.IPOption
++		want4  bool
++		want6  bool
++	}{
++		{"ipv4", dns.IPOption{IPv4Enable: true}, true, false},
++		{"ipv6", dns.IPOption{IPv6Enable: true}, false, true},
++		{"both", dns.IPOption{IPv4Enable: true, IPv6Enable: true}, true, true},
++		{"neither", dns.IPOption{}, false, false},
++	} {
++		t.Run(test.name, func(t *testing.T) {
++			server, err := net.ListenPacket("udp4", "127.0.0.1:0")
++			if err != nil {
++				t.Fatal(err)
++			}
++			var a, aaaa atomic.Int32
++			done := make(chan struct{})
++			t.Cleanup(func() { _ = server.Close(); <-done })
++			go func() {
++				defer close(done)
++				for {
++					buf := make([]byte, 512)
++					n, peer, err := server.ReadFrom(buf)
++					if err != nil {
++						return
++					}
++					var request dnsmessage.Message
++					if request.Unpack(buf[:n]) != nil || len(request.Questions) != 1 {
++						continue
++					}
++					q := request.Questions[0]
++					response := dnsmessage.Message{Header: dnsmessage.Header{ID: request.ID, Response: true,
++						RecursionDesired: true, RecursionAvailable: true}, Questions: request.Questions}
++					header := dnsmessage.ResourceHeader{Name: q.Name, Type: q.Type, Class: dnsmessage.ClassINET, TTL: 30}
++					switch q.Type {
++					case dnsmessage.TypeA:
++						a.Add(1)
++						if !test.want4 {
++							continue // Disabled family is a blackhole, not a quick negative reply.
++						}
++						response.Answers = []dnsmessage.Resource{{Header: header, Body: &dnsmessage.AResource{A: [4]byte{127, 0, 0, 42}}}}
++					case dnsmessage.TypeAAAA:
++						aaaa.Add(1)
++						if !test.want6 {
++							continue
++						}
++						response.Answers = []dnsmessage.Resource{{Header: header, Body: &dnsmessage.AAAAResource{AAAA: [16]byte{15: 42}}}}
++					default:
++						continue
++					}
++					answer, err := response.Pack()
++					if err == nil {
++						_, _ = server.WriteTo(answer, peer)
++					}
++				}
++			}()
++			resolver := &net.Resolver{PreferGo: true, Dial: func(ctx context.Context, network, _ string) (net.Conn, error) {
++				return (&net.Dialer{}).DialContext(ctx, network, server.LocalAddr().String())
++			}}
++			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
++			defer cancel()
++			ctx = internet.ContextWithSystemNetworkScope(ctx, func(string, string, syscall.RawConn) error { return nil }, resolver)
++			client := NewWithContext(ctx)
++			defer client.Close()
++			ips, _, err := client.LookupIP("owned.invalid.", test.option)
++			if (a.Load() > 0) != test.want4 || (aaaa.Load() > 0) != test.want6 {
++				t.Fatalf("query families A=%d AAAA=%d", a.Load(), aaaa.Load())
++			}
++			if !test.want4 && !test.want6 {
++				if err != dns.ErrEmptyResponse || len(ips) != 0 {
++					t.Fatal("empty family selection did not fail without DNS")
++				}
++				return
++			}
++			if err != nil || len(ips) == 0 {
++				t.Fatal("enabled family lookup failed")
++			}
++			var got4, got6 bool
++			for _, ip := range ips {
++				got4 = got4 || ip.Equal(net.ParseIP("127.0.0.42"))
++				got6 = got6 || ip.Equal(net.ParseIP("::2a"))
++			}
++			if got4 != test.want4 || got6 != test.want6 {
++				t.Fatal("response family mismatch")
++			}
++		})
++	}
++}
++
++func TestSalfetkaScopedLookupCancellationAndInvalidScopeFailClosed(t *testing.T) {
++	var calls atomic.Int32
++	resolver := &net.Resolver{PreferGo: true, Dial: func(ctx context.Context, _, _ string) (net.Conn, error) {
++		calls.Add(1)
++		<-ctx.Done()
++		return nil, ctx.Err()
++	}}
++	ctx, cancel := context.WithCancel(context.Background())
++	cancel()
++	ctx = internet.ContextWithSystemNetworkScope(ctx, func(string, string, syscall.RawConn) error { return nil }, resolver)
++	client := NewWithContext(ctx)
++	defer client.Close()
++	if ips, _, err := client.LookupIP("owned.invalid.", dns.IPOption{IPv4Enable: true}); err == nil || len(ips) != 0 || calls.Load() != 0 {
++		t.Fatal("canceled lookup reached resolver or returned success")
++	}
++	ctx, cancel = context.WithTimeout(context.Background(), time.Second)
++	defer cancel()
++	client = NewWithContext(internet.ContextWithSystemNetworkScope(ctx, nil, nil))
++	defer client.Close()
++	if ips, _, err := client.LookupIP("owned.invalid.", dns.IPOption{IPv4Enable: true}); err == nil || len(ips) != 0 || !strings.Contains(err.Error(), "measurement network scope unavailable") {
++		t.Fatal("invalid scope did not retain its rejecting resolver")
++	}
++}
++
++func TestSalfetkaScopedLookupStopsWhenOwnerCancels(t *testing.T) {
++	entered := make(chan struct{}, 2)
++	resolver := &net.Resolver{PreferGo: true, Dial: func(ctx context.Context, _, _ string) (net.Conn, error) {
++		select {
++		case entered <- struct{}{}:
++		default:
++		}
++		<-ctx.Done()
++		return nil, ctx.Err()
++	}}
++	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
++	defer cancel()
++	ctx = internet.ContextWithSystemNetworkScope(ctx, func(string, string, syscall.RawConn) error { return nil }, resolver)
++	client := NewWithContext(ctx)
++	defer client.Close()
++	done := make(chan error, 1)
++	go func() {
++		_, _, err := client.LookupIP("owned.invalid.", dns.IPOption{IPv4Enable: true, IPv6Enable: true})
++		done <- err
++	}()
++	select {
++	case <-entered:
++	case <-ctx.Done():
++		t.Fatal("lookup did not reach its owned resolver")
++	}
++	cancel()
++	select {
++	case err := <-done:
++		if err == nil {
++			t.Fatal("canceled lookup succeeded")
++		}
++	case <-time.After(time.Second):
++		t.Fatal("owner cancellation did not stop lookup")
++	}
++}
