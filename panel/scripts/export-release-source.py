@@ -33,6 +33,11 @@ def files():
         'panel/tests/compatibility/fixtures.json', 'panel/tests/compatibility/manifest_test.go',
         'services/traffic_observation.py', 'services/traffic_observation_sources.py',
         'panel/tests/acceptance_installer_linux.py'])
+    golden = json.loads((ROOT / 'panel/tests/compatibility/fixtures.json').read_text())
+    for relative in golden['source_hashes']:
+        if not relative.startswith(('mobile/scripts/', 'mobile/tests/', 'mobile/contracts/', 'panel/tests/compatibility/')):
+            raise ValueError('golden_source_outside_allowlist')
+        chosen.add(relative)
     baseline = json.loads((ROOT / 'panel/third_party/mobile-baseline.lock.json').read_text())
     for dep in baseline['dependencies']:
         if dep['id'] in ('xray-core', 'gvisor'):
