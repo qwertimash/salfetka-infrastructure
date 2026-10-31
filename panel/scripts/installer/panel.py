@@ -101,7 +101,7 @@ def stage(home, package, config, image, public_cert, public_key):
     sub_origin = 'https://' + config['subscription_domain'] + (':9443' if config['public_port'] == 9443 else '')
     machine_origin = 'https://' + config['admin_domain'] + ':18443'
     services['admin']['environment'].update(PANEL_PUBLIC_ORIGIN=admin_origin, PANEL_NODE_INSTALL_ORIGIN=machine_origin)
-    services['admin']['ports'] = ['0.0.0.0:18443:18443']
+    services['admin']['ports'] = ['18443:18443']
     # Delivery is reachable only via its separate nginx vhost and Compose network.
     services['delivery'].pop('ports', None)
     services['edge'] = {'image': NGINX, 'entrypoint': ['nginx', '-g', 'daemon off;'],
@@ -109,7 +109,7 @@ def stage(home, package, config, image, public_cert, public_key):
         'security_opt': ['no-new-privileges:true'], 'tmpfs': ['/tmp:size=32m,mode=1777'],
         'restart': 'unless-stopped', 'pids_limit': 128, 'mem_limit': '128m',
         'logging': {'driver': 'local', 'options': {'max-size': '5m', 'max-file': '3'}},
-        'ports': [f"0.0.0.0:{config['public_port']}:8443"],
+        'ports': [f"{config['public_port']}:8443"],
         'volumes': ['./edge.conf:/etc/nginx/nginx.conf:ro', './public-tls:/tls:ro', './secrets/tls.crt:/machine/tls.crt:ro']}
     # The edge UID has read-only access to its own public TLS; machine secrets stay private.
     (home / 'public-tls').chmod(0o750)

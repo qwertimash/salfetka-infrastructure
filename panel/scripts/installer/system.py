@@ -58,6 +58,8 @@ def free_ports(ports):
     for port in ports:
         with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as sock:
             sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+            # Retired connections in TIME_WAIT are not a foreign listener.
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             try: sock.bind(('::', port))
             except OSError: raise ValueError('required_port_busy:' + str(port)) from None
 

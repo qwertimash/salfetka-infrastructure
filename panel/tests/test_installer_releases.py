@@ -151,3 +151,13 @@ class ReleasesTests(unittest.TestCase):
         link=self.root/'linked';link.symlink_to(file)
         with self.assertRaises(Failure):atomic(link,b'bad')
         self.assertEqual(file.read_bytes(),b'old')
+
+    def test_github_artifact_mode_normalization_keeps_panelctl_executable(self):
+        import importlib.util
+        spec=importlib.util.spec_from_file_location('release_builder',Path(__file__).resolve().parents[1]/'scripts/build-release.py')
+        builder=importlib.util.module_from_spec(spec);spec.loader.exec_module(builder)
+        source=self.root/'source';(source/'artifacts/bin').mkdir(parents=True)
+        binary=source/'artifacts/bin/panelctl';binary.write_bytes(b'\x7fELF'+b'0'*20);binary.chmod(0o644)
+        target=self.root/'package.tar.gz';builder.archive(source,target)
+        with tarfile.open(target) as package:
+            self.assertEqual(package.getmember('artifacts/bin/panelctl').mode,0o755)

@@ -144,3 +144,11 @@ class LifecycleTests(unittest.TestCase):
         with patch.object(node,'HOME',self.root/'node'), patch.object(node,'owned'), patch.object(node,'run') as run:
             with self.assertRaisesRegex(Failure,'architecture'):node.update(package,'0.6.1')
         run.assert_not_called()
+
+    def test_busy_tcp_listener_is_rejected_even_with_address_reuse(self):
+        import socket
+        with socket.socket(socket.AF_INET6,socket.SOCK_STREAM) as listener:
+            listener.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+            listener.bind(('::',0));listener.listen()
+            with self.assertRaisesRegex(ValueError,'port_busy'):
+                system.free_ports([listener.getsockname()[1]])

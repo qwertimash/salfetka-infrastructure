@@ -158,7 +158,7 @@ class Manager:
         home = self.root / 'panel'
         if role in ('panel', 'both'):
             password = password or private_prompt('Пароль владельца (не менее 12 символов): ')
-            require(12 <= len(password) <= 256, 'owner_password_length_invalid')
+            require(len(password) >= 12 and len(password.encode('utf-8')) <= 128, 'owner_password_length_invalid')
             if not home.exists():
                 system.free_ports([80, 18443, config['public_port']])
                 self.journal('install', 'certificate', target=manifest['version'])

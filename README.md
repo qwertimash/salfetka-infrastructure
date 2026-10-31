@@ -12,9 +12,17 @@ Bootstrap `install.py` из официального репозитория пр
 В приватной разработке передайте `--github-token-file /root/github-read-token`
 (файл 0600, только чтение этого репозитория). Не передавайте токен в URL/argv.
 
+После открытия репозитория:
+
 ```sh
-sudo python3 install.py --version 0.6.0
+download_dir=$(mktemp -d)
+curl -fL --proto '=https' --tlsv1.2 https://github.com/qwertimash/salfetka-infrastructure/releases/latest/download/install.py -o "$download_dir/install.py"
+sudo python3 "$download_dir/install.py"
 ```
+
+Пока репозиторий PRIVATE, получите `install.py` из Release через авторизованный
+GitHub/`gh release download`, затем запустите с `--github-token-file`.
+
 
 Мастер предлагает три варианта:
 
@@ -29,8 +37,8 @@ sudo python3 install.py --version 0.6.0
 Вариант «панель» использует TCP 443 для web/подписок. В совмещённом варианте web
 и подписки используют HTTPS 9443; TCP/UDP 443 остаются VPN-ноду. В обоих вариантах
 TCP 18443 — отдельный проверяемый TLS-вход для нод. DNS A/AAAA должен вести на
-этот сервер, входящий TCP 80 нужен Let’s Encrypt. Установщик не меняет firewall/DNS
-и не удаляет чужие службы. Занятый порт или чужой ресурс останавливает установку.
+этот сервер, входящий TCP 80 нужен Let’s Encrypt. Установщик не переписывает пользовательские правила firewall/DNS
+и не удаляет чужие службы. Docker публикует перечисленные TCP-порты на IPv4/IPv6. Занятый порт или чужой ресурс останавливает установку.
 
 Публичные сертификаты ACME продлеваются отдельным systemd timer дважды в сутки.
 Их продление не меняет доверие установленных нод: машинный сертификат и signer
