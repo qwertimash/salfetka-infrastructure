@@ -1,0 +1,4096 @@
+{
+  "scope": "B0 semantic-preservation spike; not a production validator/compiler",
+  "source_hashes": {
+    "panel/tests/compatibility/export_fixtures.py": "cbeccb75bcd05901e8952bdde8a8f98e3763c1da1e3a85348ba0d576c69246ce",
+    "mobile/tests/test_source_manifest.py": "dfee478986c35da0454d185da47b1247988c98e8440abae7aaa76eefffe14b77",
+    "mobile/scripts/source_manifest.py": "c45d1f21e164eebb12b53d751655c3bef8fffbd0f6a3a2ce02e82989db48d0cd",
+    "mobile/scripts/subscription_catalog.py": "0834be5bbc6dff97f3264dacbd4179918ad65bebebb5fcdcdc281a68d3125771",
+    "mobile/scripts/routing_contract.py": "2ece2b0bb2adf6b5a978825b3035a720d5af277ca868d1df976206845583205c",
+    "mobile/tests/fixtures/subscription-manifest.json": "a76d8a1df3e6e046ef38765f853b3ec4a68a4497ad6444cba339582c3b3aa95f",
+    "mobile/contracts/subscription-manifest.schema.json": "4b249711daa0624e1990f80960f974261417e58c01905f71017616cd937c246b",
+    "mobile/contracts/subscription-manifest-v2.schema.json": "2cf6940e6fdf5c16422c57b91f4fc8d2507deb3e6d3707a28a6ba6684837c0e1",
+    "mobile/contracts/routing-policy.schema.json": "6bb9f8a9b1de0038ce40821a57d8a5676b90c99516fce5fdf1d7ae1c52f044f6"
+  },
+  "cases": [
+    {
+      "name": "full_v1",
+      "input": {
+        "lab": {
+          "schema_version": 1,
+          "catalog_id": "synthetic-lab",
+          "revision": 1,
+          "expires_at": "2030-11-01T00:00:00Z",
+          "profiles": [
+            {
+              "id": "synthetic-fi-tcp",
+              "name": "Synthetic source profile",
+              "mode": "vpn",
+              "exit_country": "FI",
+              "engine": "xray",
+              "settings": {
+                "outbound": {
+                  "tag": "proxy-fi-tcp",
+                  "protocol": "vless",
+                  "settings": {
+                    "vnext": [
+                      {
+                        "address": "tcp.example.invalid",
+                        "port": 443,
+                        "users": [
+                          {
+                            "id": "00000000-0000-4000-8000-000000000001",
+                            "encryption": "none"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "streamSettings": {
+                    "network": "tcp",
+                    "security": "tls",
+                    "tlsSettings": {
+                      "serverName": "tcp.example.invalid",
+                      "allowInsecure": false
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "synthetic-fi-grpc",
+              "name": "Synthetic source profile",
+              "mode": "vpn",
+              "exit_country": "FI",
+              "engine": "xray",
+              "settings": {
+                "outbound": {
+                  "tag": "proxy-fi-grpc",
+                  "protocol": "vless",
+                  "settings": {
+                    "vnext": [
+                      {
+                        "address": "grpc.example.invalid",
+                        "port": 443,
+                        "users": [
+                          {
+                            "id": "00000000-0000-4000-8000-000000000002",
+                            "encryption": "none"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "streamSettings": {
+                    "network": "grpc",
+                    "security": "tls",
+                    "tlsSettings": {
+                      "serverName": "grpc.example.invalid",
+                      "allowInsecure": false
+                    },
+                    "grpcSettings": {
+                      "serviceName": "synthetic-service"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "synthetic-de-olcrtc",
+              "name": "Synthetic source profile",
+              "mode": "bypass",
+              "exit_country": "DE",
+              "engine": "olcrtc",
+              "settings": {
+                "provider": "jitsi",
+                "transport": "datachannel",
+                "room": "https://room.example.invalid/synthetic-rtc",
+                "key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+                "bootstrap_dns": "1.1.1.1:53"
+              }
+            },
+            {
+              "id": "synthetic-de-openflux",
+              "name": "Synthetic source profile",
+              "mode": "bypass",
+              "exit_country": "DE",
+              "engine": "openflux",
+              "settings": {
+                "transport": "cupsonline",
+                "document_url": "synthetic-cups-room",
+                "encryption_secret": "synthetic-test-secret-do-not-use",
+                "codec": "batched"
+              }
+            }
+          ],
+          "dns_servers": [
+            "1.1.1.1",
+            "8.8.8.8"
+          ],
+          "probe": {
+            "url": "https://probe.example.invalid/generate_204",
+            "ipv4": "198.51.100.10",
+            "expected_status": 204,
+            "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "mapping": {
+          "mapping_version": 1,
+          "id": "synthetic-subscription",
+          "revision": 1,
+          "subscription": {
+            "title": "САЛФЕТКА · синтетическая подписка",
+            "description": "Пример контракта. Все доступы и адреса вымышленные; подключение не проверяется.",
+            "expires_at": "2030-12-01T00:00:00Z",
+            "traffic": [
+              {
+                "scope": "subscription",
+                "upload_bytes": 1048576,
+                "download_bytes": 4194304,
+                "limit_bytes": 1073741824
+              }
+            ]
+          },
+          "locations": [
+            {
+              "id": "synthetic-vpn-auto",
+              "mode": "vpn",
+              "kind": "auto",
+              "title": "Авто VPN · политика источника",
+              "icon": "🌐",
+              "connection_ids": [
+                "synthetic-native-auto"
+              ],
+              "selection": {
+                "type": "native"
+              }
+            },
+            {
+              "id": "synthetic-vpn-fi",
+              "mode": "vpn",
+              "kind": "location",
+              "title": "Финляндия",
+              "icon": "🇫🇮",
+              "country": "FI",
+              "connection_ids": [
+                "synthetic-fi-tcp",
+                "synthetic-fi-grpc"
+              ],
+              "selection": {
+                "type": "first_working"
+              }
+            },
+            {
+              "id": "synthetic-bypass-de-rtc",
+              "mode": "bypass",
+              "kind": "location",
+              "title": "Германия #1",
+              "icon": "🇩🇪",
+              "country": "DE",
+              "connection_ids": [
+                "synthetic-de-olcrtc"
+              ],
+              "selection": {
+                "type": "first_working"
+              }
+            },
+            {
+              "id": "synthetic-bypass-de-flux",
+              "mode": "bypass",
+              "kind": "location",
+              "title": "Германия #2",
+              "icon": "🇩🇪",
+              "country": "DE",
+              "connection_ids": [
+                "synthetic-de-openflux"
+              ],
+              "selection": {
+                "type": "first_working"
+              }
+            }
+          ],
+          "native_connection_ids": [
+            "synthetic-native-auto"
+          ]
+        },
+        "native": {
+          "synthetic-native-auto": {
+            "dns": {
+              "servers": [
+                "1.1.1.1",
+                "8.8.8.8"
+              ]
+            },
+            "outbounds": [
+              {
+                "tag": "proxy-fi-tcp",
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "tcp.example.invalid",
+                      "port": 443,
+                      "users": [
+                        {
+                          "id": "00000000-0000-4000-8000-000000000001",
+                          "encryption": "none"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "network": "tcp",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "serverName": "tcp.example.invalid",
+                    "allowInsecure": false
+                  }
+                }
+              },
+              {
+                "tag": "proxy-fi-grpc",
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "grpc.example.invalid",
+                      "port": 443,
+                      "users": [
+                        {
+                          "id": "00000000-0000-4000-8000-000000000002",
+                          "encryption": "none"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "network": "grpc",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "serverName": "grpc.example.invalid",
+                    "allowInsecure": false
+                  },
+                  "grpcSettings": {
+                    "serviceName": "synthetic-service"
+                  }
+                }
+              }
+            ],
+            "routing": {
+              "domainStrategy": "AsIs",
+              "balancers": [
+                {
+                  "tag": "synthetic-auto-balancer",
+                  "selector": [
+                    "proxy"
+                  ],
+                  "fallbackTag": "proxy-fi-tcp",
+                  "strategy": {
+                    "type": "leastPing"
+                  }
+                }
+              ],
+              "rules": [
+                {
+                  "type": "field",
+                  "network": "tcp,udp",
+                  "balancerTag": "synthetic-auto-balancer"
+                }
+              ]
+            },
+            "observatory": {
+              "subjectSelector": [
+                "proxy"
+              ],
+              "probeURL": "https://probe.example.invalid/generate_204",
+              "probeInterval": "30s",
+              "enableConcurrency": true
+            }
+          }
+        },
+        "version": 1,
+        "transport_only_ids": []
+      },
+      "expected": {
+        "connections": [
+          {
+            "engine": "xray",
+            "id": "synthetic-fi-tcp",
+            "settings": {
+              "outbound": {
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "tcp.example.invalid",
+                      "port": 443,
+                      "users": [
+                        {
+                          "encryption": "none",
+                          "id": "00000000-0000-4000-8000-000000000001"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "network": "tcp",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "allowInsecure": false,
+                    "serverName": "tcp.example.invalid"
+                  }
+                },
+                "tag": "proxy-fi-tcp"
+              }
+            }
+          },
+          {
+            "engine": "xray",
+            "id": "synthetic-fi-grpc",
+            "settings": {
+              "outbound": {
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "grpc.example.invalid",
+                      "port": 443,
+                      "users": [
+                        {
+                          "encryption": "none",
+                          "id": "00000000-0000-4000-8000-000000000002"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "grpcSettings": {
+                    "serviceName": "synthetic-service"
+                  },
+                  "network": "grpc",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "allowInsecure": false,
+                    "serverName": "grpc.example.invalid"
+                  }
+                },
+                "tag": "proxy-fi-grpc"
+              }
+            }
+          },
+          {
+            "engine": "olcrtc",
+            "id": "synthetic-de-olcrtc",
+            "settings": {
+              "bootstrap_dns": "1.1.1.1:53",
+              "key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+              "provider": "jitsi",
+              "room": "https://room.example.invalid/synthetic-rtc",
+              "transport": "datachannel"
+            }
+          },
+          {
+            "engine": "openflux",
+            "id": "synthetic-de-openflux",
+            "settings": {
+              "codec": "batched",
+              "document_url": "synthetic-cups-room",
+              "encryption_secret": "synthetic-test-secret-do-not-use",
+              "transport": "cupsonline"
+            }
+          },
+          {
+            "engine": "xray",
+            "id": "synthetic-native-auto",
+            "settings": {
+              "xray_config": {
+                "dns": {
+                  "servers": [
+                    "1.1.1.1",
+                    "8.8.8.8"
+                  ]
+                },
+                "observatory": {
+                  "enableConcurrency": true,
+                  "probeInterval": "30s",
+                  "probeURL": "https://probe.example.invalid/generate_204",
+                  "subjectSelector": [
+                    "proxy"
+                  ]
+                },
+                "outbounds": [
+                  {
+                    "protocol": "vless",
+                    "settings": {
+                      "vnext": [
+                        {
+                          "address": "tcp.example.invalid",
+                          "port": 443,
+                          "users": [
+                            {
+                              "encryption": "none",
+                              "id": "00000000-0000-4000-8000-000000000001"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "streamSettings": {
+                      "network": "tcp",
+                      "security": "tls",
+                      "tlsSettings": {
+                        "allowInsecure": false,
+                        "serverName": "tcp.example.invalid"
+                      }
+                    },
+                    "tag": "proxy-fi-tcp"
+                  },
+                  {
+                    "protocol": "vless",
+                    "settings": {
+                      "vnext": [
+                        {
+                          "address": "grpc.example.invalid",
+                          "port": 443,
+                          "users": [
+                            {
+                              "encryption": "none",
+                              "id": "00000000-0000-4000-8000-000000000002"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "streamSettings": {
+                      "grpcSettings": {
+                        "serviceName": "synthetic-service"
+                      },
+                      "network": "grpc",
+                      "security": "tls",
+                      "tlsSettings": {
+                        "allowInsecure": false,
+                        "serverName": "grpc.example.invalid"
+                      }
+                    },
+                    "tag": "proxy-fi-grpc"
+                  }
+                ],
+                "routing": {
+                  "balancers": [
+                    {
+                      "fallbackTag": "proxy-fi-tcp",
+                      "selector": [
+                        "proxy"
+                      ],
+                      "strategy": {
+                        "type": "leastPing"
+                      },
+                      "tag": "synthetic-auto-balancer"
+                    }
+                  ],
+                  "domainStrategy": "AsIs",
+                  "rules": [
+                    {
+                      "balancerTag": "synthetic-auto-balancer",
+                      "network": "tcp,udp",
+                      "type": "field"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ],
+        "format": "salfetka.subscription",
+        "id": "synthetic-subscription",
+        "locations": [
+          {
+            "connection_ids": [
+              "synthetic-native-auto"
+            ],
+            "icon": "🌐",
+            "id": "synthetic-vpn-auto",
+            "kind": "auto",
+            "mode": "vpn",
+            "selection": {
+              "type": "native"
+            },
+            "title": "Авто VPN · политика источника"
+          },
+          {
+            "connection_ids": [
+              "synthetic-fi-tcp",
+              "synthetic-fi-grpc"
+            ],
+            "country": "FI",
+            "icon": "🇫🇮",
+            "id": "synthetic-vpn-fi",
+            "kind": "location",
+            "mode": "vpn",
+            "selection": {
+              "type": "first_working"
+            },
+            "title": "Финляндия"
+          },
+          {
+            "connection_ids": [
+              "synthetic-de-olcrtc"
+            ],
+            "country": "DE",
+            "icon": "🇩🇪",
+            "id": "synthetic-bypass-de-rtc",
+            "kind": "location",
+            "mode": "bypass",
+            "selection": {
+              "type": "first_working"
+            },
+            "title": "Германия #1"
+          },
+          {
+            "connection_ids": [
+              "synthetic-de-openflux"
+            ],
+            "country": "DE",
+            "icon": "🇩🇪",
+            "id": "synthetic-bypass-de-flux",
+            "kind": "location",
+            "mode": "bypass",
+            "selection": {
+              "type": "first_working"
+            },
+            "title": "Германия #2"
+          }
+        ],
+        "network": {
+          "dns_servers": [
+            "1.1.1.1",
+            "8.8.8.8"
+          ],
+          "probe": {
+            "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "expected_status": 204,
+            "ipv4": "198.51.100.10",
+            "url": "https://probe.example.invalid/generate_204"
+          }
+        },
+        "revision": 1,
+        "subscription": {
+          "description": "Пример контракта. Все доступы и адреса вымышленные; подключение не проверяется.",
+          "expires_at": "2030-12-01T00:00:00Z",
+          "title": "САЛФЕТКА · синтетическая подписка",
+          "traffic": [
+            {
+              "download_bytes": 4194304,
+              "limit_bytes": 1073741824,
+              "scope": "subscription",
+              "upload_bytes": 1048576
+            }
+          ]
+        },
+        "valid_until": "2030-11-01T00:00:00Z",
+        "version": 1
+      }
+    },
+    {
+      "name": "native_display",
+      "input": {
+        "lab": {
+          "schema_version": 1,
+          "catalog_id": "synthetic-lab",
+          "revision": 1,
+          "expires_at": "2030-11-01T00:00:00Z",
+          "profiles": [
+            {
+              "id": "synthetic-fi-tcp",
+              "name": "Synthetic source profile",
+              "mode": "vpn",
+              "exit_country": "FI",
+              "engine": "xray",
+              "settings": {
+                "outbound": {
+                  "tag": "proxy-fi-tcp",
+                  "protocol": "vless",
+                  "settings": {
+                    "vnext": [
+                      {
+                        "address": "tcp.example.invalid",
+                        "port": 443,
+                        "users": [
+                          {
+                            "id": "00000000-0000-4000-8000-000000000001",
+                            "encryption": "none"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "streamSettings": {
+                    "network": "tcp",
+                    "security": "tls",
+                    "tlsSettings": {
+                      "serverName": "tcp.example.invalid",
+                      "allowInsecure": false
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "synthetic-fi-grpc",
+              "name": "Synthetic source profile",
+              "mode": "vpn",
+              "exit_country": "FI",
+              "engine": "xray",
+              "settings": {
+                "outbound": {
+                  "tag": "proxy-fi-grpc",
+                  "protocol": "vless",
+                  "settings": {
+                    "vnext": [
+                      {
+                        "address": "grpc.example.invalid",
+                        "port": 443,
+                        "users": [
+                          {
+                            "id": "00000000-0000-4000-8000-000000000002",
+                            "encryption": "none"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "streamSettings": {
+                    "network": "grpc",
+                    "security": "tls",
+                    "tlsSettings": {
+                      "serverName": "grpc.example.invalid",
+                      "allowInsecure": false
+                    },
+                    "grpcSettings": {
+                      "serviceName": "synthetic-service"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "synthetic-de-olcrtc",
+              "name": "Synthetic source profile",
+              "mode": "bypass",
+              "exit_country": "DE",
+              "engine": "olcrtc",
+              "settings": {
+                "provider": "jitsi",
+                "transport": "datachannel",
+                "room": "https://room.example.invalid/synthetic-rtc",
+                "key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+                "bootstrap_dns": "1.1.1.1:53"
+              }
+            },
+            {
+              "id": "synthetic-de-openflux",
+              "name": "Synthetic source profile",
+              "mode": "bypass",
+              "exit_country": "DE",
+              "engine": "openflux",
+              "settings": {
+                "transport": "cupsonline",
+                "document_url": "synthetic-cups-room",
+                "encryption_secret": "synthetic-test-secret-do-not-use",
+                "codec": "batched"
+              }
+            }
+          ],
+          "dns_servers": [
+            "1.1.1.1",
+            "8.8.8.8"
+          ],
+          "probe": {
+            "url": "https://probe.example.invalid/generate_204",
+            "ipv4": "198.51.100.10",
+            "expected_status": 204,
+            "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "mapping": {
+          "mapping_version": 1,
+          "id": "synthetic-subscription",
+          "revision": 1,
+          "subscription": {
+            "title": "САЛФЕТКА · синтетическая подписка",
+            "description": "Пример контракта. Все доступы и адреса вымышленные; подключение не проверяется.",
+            "expires_at": "2030-12-01T00:00:00Z",
+            "traffic": [
+              {
+                "scope": "subscription",
+                "upload_bytes": 1048576,
+                "download_bytes": 4194304,
+                "limit_bytes": 1073741824
+              }
+            ]
+          },
+          "locations": [
+            {
+              "id": "synthetic-vpn-auto",
+              "mode": "vpn",
+              "kind": "auto",
+              "title": "Авто VPN · политика источника",
+              "icon": "🌐",
+              "connection_ids": [
+                "synthetic-native-auto"
+              ],
+              "selection": {
+                "type": "native"
+              }
+            },
+            {
+              "id": "synthetic-vpn-fi",
+              "mode": "vpn",
+              "kind": "location",
+              "title": "Финляндия",
+              "icon": "🇫🇮",
+              "country": "FI",
+              "connection_ids": [
+                "synthetic-fi-tcp",
+                "synthetic-fi-grpc"
+              ],
+              "selection": {
+                "type": "first_working"
+              }
+            },
+            {
+              "id": "synthetic-bypass-de-rtc",
+              "mode": "bypass",
+              "kind": "location",
+              "title": "Германия #1",
+              "icon": "🇩🇪",
+              "country": "DE",
+              "connection_ids": [
+                "synthetic-de-olcrtc"
+              ],
+              "selection": {
+                "type": "first_working"
+              }
+            },
+            {
+              "id": "synthetic-bypass-de-flux",
+              "mode": "bypass",
+              "kind": "location",
+              "title": "Германия #2",
+              "icon": "🇩🇪",
+              "country": "DE",
+              "connection_ids": [
+                "synthetic-de-openflux"
+              ],
+              "selection": {
+                "type": "first_working"
+              }
+            }
+          ],
+          "native_connection_ids": [
+            "synthetic-native-auto"
+          ]
+        },
+        "native": {
+          "synthetic-native-auto": {
+            "dns": {
+              "servers": [
+                "1.1.1.1",
+                "8.8.8.8"
+              ]
+            },
+            "outbounds": [
+              {
+                "tag": "proxy-fi-tcp",
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "tcp.example.invalid",
+                      "port": 443,
+                      "users": [
+                        {
+                          "id": "00000000-0000-4000-8000-000000000001",
+                          "encryption": "none"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "network": "tcp",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "serverName": "tcp.example.invalid",
+                    "allowInsecure": false
+                  }
+                }
+              },
+              {
+                "tag": "proxy-fi-grpc",
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "grpc.example.invalid",
+                      "port": 443,
+                      "users": [
+                        {
+                          "id": "00000000-0000-4000-8000-000000000002",
+                          "encryption": "none"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "network": "grpc",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "serverName": "grpc.example.invalid",
+                    "allowInsecure": false
+                  },
+                  "grpcSettings": {
+                    "serviceName": "synthetic-service"
+                  }
+                }
+              }
+            ],
+            "routing": {
+              "domainStrategy": "AsIs",
+              "balancers": [
+                {
+                  "tag": "synthetic-auto-balancer",
+                  "selector": [
+                    "proxy"
+                  ],
+                  "fallbackTag": "proxy-fi-tcp",
+                  "strategy": {
+                    "type": "leastPing"
+                  }
+                }
+              ],
+              "rules": [
+                {
+                  "type": "field",
+                  "network": "tcp,udp",
+                  "balancerTag": "synthetic-auto-balancer"
+                }
+              ]
+            },
+            "observatory": {
+              "subjectSelector": [
+                "proxy"
+              ],
+              "probeURL": "https://probe.example.invalid/generate_204",
+              "probeInterval": "30s",
+              "enableConcurrency": true
+            },
+            "remarks": "Синтетика <>&",
+            "meta": {
+              "display": "synthetic"
+            }
+          }
+        },
+        "version": 1,
+        "transport_only_ids": []
+      },
+      "expected": {
+        "connections": [
+          {
+            "engine": "xray",
+            "id": "synthetic-fi-tcp",
+            "settings": {
+              "outbound": {
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "tcp.example.invalid",
+                      "port": 443,
+                      "users": [
+                        {
+                          "encryption": "none",
+                          "id": "00000000-0000-4000-8000-000000000001"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "network": "tcp",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "allowInsecure": false,
+                    "serverName": "tcp.example.invalid"
+                  }
+                },
+                "tag": "proxy-fi-tcp"
+              }
+            }
+          },
+          {
+            "engine": "xray",
+            "id": "synthetic-fi-grpc",
+            "settings": {
+              "outbound": {
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "grpc.example.invalid",
+                      "port": 443,
+                      "users": [
+                        {
+                          "encryption": "none",
+                          "id": "00000000-0000-4000-8000-000000000002"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "grpcSettings": {
+                    "serviceName": "synthetic-service"
+                  },
+                  "network": "grpc",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "allowInsecure": false,
+                    "serverName": "grpc.example.invalid"
+                  }
+                },
+                "tag": "proxy-fi-grpc"
+              }
+            }
+          },
+          {
+            "engine": "olcrtc",
+            "id": "synthetic-de-olcrtc",
+            "settings": {
+              "bootstrap_dns": "1.1.1.1:53",
+              "key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+              "provider": "jitsi",
+              "room": "https://room.example.invalid/synthetic-rtc",
+              "transport": "datachannel"
+            }
+          },
+          {
+            "engine": "openflux",
+            "id": "synthetic-de-openflux",
+            "settings": {
+              "codec": "batched",
+              "document_url": "synthetic-cups-room",
+              "encryption_secret": "synthetic-test-secret-do-not-use",
+              "transport": "cupsonline"
+            }
+          },
+          {
+            "engine": "xray",
+            "id": "synthetic-native-auto",
+            "settings": {
+              "xray_config": {
+                "dns": {
+                  "servers": [
+                    "1.1.1.1",
+                    "8.8.8.8"
+                  ]
+                },
+                "observatory": {
+                  "enableConcurrency": true,
+                  "probeInterval": "30s",
+                  "probeURL": "https://probe.example.invalid/generate_204",
+                  "subjectSelector": [
+                    "proxy"
+                  ]
+                },
+                "outbounds": [
+                  {
+                    "protocol": "vless",
+                    "settings": {
+                      "vnext": [
+                        {
+                          "address": "tcp.example.invalid",
+                          "port": 443,
+                          "users": [
+                            {
+                              "encryption": "none",
+                              "id": "00000000-0000-4000-8000-000000000001"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "streamSettings": {
+                      "network": "tcp",
+                      "security": "tls",
+                      "tlsSettings": {
+                        "allowInsecure": false,
+                        "serverName": "tcp.example.invalid"
+                      }
+                    },
+                    "tag": "proxy-fi-tcp"
+                  },
+                  {
+                    "protocol": "vless",
+                    "settings": {
+                      "vnext": [
+                        {
+                          "address": "grpc.example.invalid",
+                          "port": 443,
+                          "users": [
+                            {
+                              "encryption": "none",
+                              "id": "00000000-0000-4000-8000-000000000002"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "streamSettings": {
+                      "grpcSettings": {
+                        "serviceName": "synthetic-service"
+                      },
+                      "network": "grpc",
+                      "security": "tls",
+                      "tlsSettings": {
+                        "allowInsecure": false,
+                        "serverName": "grpc.example.invalid"
+                      }
+                    },
+                    "tag": "proxy-fi-grpc"
+                  }
+                ],
+                "routing": {
+                  "balancers": [
+                    {
+                      "fallbackTag": "proxy-fi-tcp",
+                      "selector": [
+                        "proxy"
+                      ],
+                      "strategy": {
+                        "type": "leastPing"
+                      },
+                      "tag": "synthetic-auto-balancer"
+                    }
+                  ],
+                  "domainStrategy": "AsIs",
+                  "rules": [
+                    {
+                      "balancerTag": "synthetic-auto-balancer",
+                      "network": "tcp,udp",
+                      "type": "field"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ],
+        "format": "salfetka.subscription",
+        "id": "synthetic-subscription",
+        "locations": [
+          {
+            "connection_ids": [
+              "synthetic-native-auto"
+            ],
+            "icon": "🌐",
+            "id": "synthetic-vpn-auto",
+            "kind": "auto",
+            "mode": "vpn",
+            "selection": {
+              "type": "native"
+            },
+            "title": "Авто VPN · политика источника"
+          },
+          {
+            "connection_ids": [
+              "synthetic-fi-tcp",
+              "synthetic-fi-grpc"
+            ],
+            "country": "FI",
+            "icon": "🇫🇮",
+            "id": "synthetic-vpn-fi",
+            "kind": "location",
+            "mode": "vpn",
+            "selection": {
+              "type": "first_working"
+            },
+            "title": "Финляндия"
+          },
+          {
+            "connection_ids": [
+              "synthetic-de-olcrtc"
+            ],
+            "country": "DE",
+            "icon": "🇩🇪",
+            "id": "synthetic-bypass-de-rtc",
+            "kind": "location",
+            "mode": "bypass",
+            "selection": {
+              "type": "first_working"
+            },
+            "title": "Германия #1"
+          },
+          {
+            "connection_ids": [
+              "synthetic-de-openflux"
+            ],
+            "country": "DE",
+            "icon": "🇩🇪",
+            "id": "synthetic-bypass-de-flux",
+            "kind": "location",
+            "mode": "bypass",
+            "selection": {
+              "type": "first_working"
+            },
+            "title": "Германия #2"
+          }
+        ],
+        "network": {
+          "dns_servers": [
+            "1.1.1.1",
+            "8.8.8.8"
+          ],
+          "probe": {
+            "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "expected_status": 204,
+            "ipv4": "198.51.100.10",
+            "url": "https://probe.example.invalid/generate_204"
+          }
+        },
+        "revision": 1,
+        "subscription": {
+          "description": "Пример контракта. Все доступы и адреса вымышленные; подключение не проверяется.",
+          "expires_at": "2030-12-01T00:00:00Z",
+          "title": "САЛФЕТКА · синтетическая подписка",
+          "traffic": [
+            {
+              "download_bytes": 4194304,
+              "limit_bytes": 1073741824,
+              "scope": "subscription",
+              "upload_bytes": 1048576
+            }
+          ]
+        },
+        "valid_until": "2030-11-01T00:00:00Z",
+        "version": 1
+      }
+    },
+    {
+      "name": "least_load",
+      "input": {
+        "lab": {
+          "schema_version": 1,
+          "catalog_id": "synthetic-lab",
+          "revision": 1,
+          "expires_at": "2030-11-01T00:00:00Z",
+          "profiles": [
+            {
+              "id": "synthetic-fi-tcp",
+              "name": "Synthetic source profile",
+              "mode": "vpn",
+              "exit_country": "FI",
+              "engine": "xray",
+              "settings": {
+                "outbound": {
+                  "tag": "proxy-fi-tcp",
+                  "protocol": "vless",
+                  "settings": {
+                    "vnext": [
+                      {
+                        "address": "tcp.example.invalid",
+                        "port": 443,
+                        "users": [
+                          {
+                            "id": "00000000-0000-4000-8000-000000000001",
+                            "encryption": "none"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "streamSettings": {
+                    "network": "tcp",
+                    "security": "tls",
+                    "tlsSettings": {
+                      "serverName": "tcp.example.invalid",
+                      "allowInsecure": false
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "synthetic-fi-grpc",
+              "name": "Synthetic source profile",
+              "mode": "vpn",
+              "exit_country": "FI",
+              "engine": "xray",
+              "settings": {
+                "outbound": {
+                  "tag": "proxy-fi-grpc",
+                  "protocol": "vless",
+                  "settings": {
+                    "vnext": [
+                      {
+                        "address": "grpc.example.invalid",
+                        "port": 443,
+                        "users": [
+                          {
+                            "id": "00000000-0000-4000-8000-000000000002",
+                            "encryption": "none"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "streamSettings": {
+                    "network": "grpc",
+                    "security": "tls",
+                    "tlsSettings": {
+                      "serverName": "grpc.example.invalid",
+                      "allowInsecure": false
+                    },
+                    "grpcSettings": {
+                      "serviceName": "synthetic-service"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "synthetic-de-olcrtc",
+              "name": "Synthetic source profile",
+              "mode": "bypass",
+              "exit_country": "DE",
+              "engine": "olcrtc",
+              "settings": {
+                "provider": "jitsi",
+                "transport": "datachannel",
+                "room": "https://room.example.invalid/synthetic-rtc",
+                "key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+                "bootstrap_dns": "1.1.1.1:53"
+              }
+            },
+            {
+              "id": "synthetic-de-openflux",
+              "name": "Synthetic source profile",
+              "mode": "bypass",
+              "exit_country": "DE",
+              "engine": "openflux",
+              "settings": {
+                "transport": "cupsonline",
+                "document_url": "synthetic-cups-room",
+                "encryption_secret": "synthetic-test-secret-do-not-use",
+                "codec": "batched"
+              }
+            }
+          ],
+          "dns_servers": [
+            "1.1.1.1",
+            "8.8.8.8"
+          ],
+          "probe": {
+            "url": "https://probe.example.invalid/generate_204",
+            "ipv4": "198.51.100.10",
+            "expected_status": 204,
+            "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "mapping": {
+          "mapping_version": 1,
+          "id": "synthetic-subscription",
+          "revision": 1,
+          "subscription": {
+            "title": "САЛФЕТКА · синтетическая подписка",
+            "description": "Пример контракта. Все доступы и адреса вымышленные; подключение не проверяется.",
+            "expires_at": "2030-12-01T00:00:00Z",
+            "traffic": [
+              {
+                "scope": "subscription",
+                "upload_bytes": 1048576,
+                "download_bytes": 4194304,
+                "limit_bytes": 1073741824
+              }
+            ]
+          },
+          "locations": [
+            {
+              "id": "synthetic-vpn-auto",
+              "mode": "vpn",
+              "kind": "auto",
+              "title": "Авто VPN · политика источника",
+              "icon": "🌐",
+              "connection_ids": [
+                "synthetic-native-auto"
+              ],
+              "selection": {
+                "type": "native"
+              }
+            },
+            {
+              "id": "synthetic-vpn-fi",
+              "mode": "vpn",
+              "kind": "location",
+              "title": "Финляндия",
+              "icon": "🇫🇮",
+              "country": "FI",
+              "connection_ids": [
+                "synthetic-fi-tcp",
+                "synthetic-fi-grpc"
+              ],
+              "selection": {
+                "type": "first_working"
+              }
+            },
+            {
+              "id": "synthetic-bypass-de-rtc",
+              "mode": "bypass",
+              "kind": "location",
+              "title": "Германия #1",
+              "icon": "🇩🇪",
+              "country": "DE",
+              "connection_ids": [
+                "synthetic-de-olcrtc"
+              ],
+              "selection": {
+                "type": "first_working"
+              }
+            },
+            {
+              "id": "synthetic-bypass-de-flux",
+              "mode": "bypass",
+              "kind": "location",
+              "title": "Германия #2",
+              "icon": "🇩🇪",
+              "country": "DE",
+              "connection_ids": [
+                "synthetic-de-openflux"
+              ],
+              "selection": {
+                "type": "first_working"
+              }
+            }
+          ],
+          "native_connection_ids": [
+            "synthetic-native-auto"
+          ]
+        },
+        "native": {
+          "synthetic-native-auto": {
+            "dns": {
+              "servers": [
+                "1.1.1.1",
+                "8.8.8.8"
+              ]
+            },
+            "outbounds": [
+              {
+                "tag": "proxy-fi-tcp",
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "tcp.example.invalid",
+                      "port": 443,
+                      "users": [
+                        {
+                          "id": "00000000-0000-4000-8000-000000000001",
+                          "encryption": "none"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "network": "tcp",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "serverName": "tcp.example.invalid",
+                    "allowInsecure": false
+                  }
+                }
+              },
+              {
+                "tag": "proxy-fi-grpc",
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "grpc.example.invalid",
+                      "port": 443,
+                      "users": [
+                        {
+                          "id": "00000000-0000-4000-8000-000000000002",
+                          "encryption": "none"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "network": "grpc",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "serverName": "grpc.example.invalid",
+                    "allowInsecure": false
+                  },
+                  "grpcSettings": {
+                    "serviceName": "synthetic-service"
+                  }
+                }
+              }
+            ],
+            "routing": {
+              "domainStrategy": "AsIs",
+              "balancers": [
+                {
+                  "tag": "synthetic-auto-balancer",
+                  "selector": [
+                    "proxy"
+                  ],
+                  "fallbackTag": "proxy-fi-tcp",
+                  "strategy": {
+                    "type": "leastLoad"
+                  }
+                }
+              ],
+              "rules": [
+                {
+                  "type": "field",
+                  "network": "tcp,udp",
+                  "balancerTag": "synthetic-auto-balancer"
+                }
+              ]
+            },
+            "observatory": {
+              "subjectSelector": [
+                "proxy"
+              ],
+              "probeURL": "https://probe.example.invalid/generate_204",
+              "probeInterval": "30s",
+              "enableConcurrency": true
+            }
+          }
+        },
+        "version": 1,
+        "transport_only_ids": []
+      },
+      "expected": {
+        "connections": [
+          {
+            "engine": "xray",
+            "id": "synthetic-fi-tcp",
+            "settings": {
+              "outbound": {
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "tcp.example.invalid",
+                      "port": 443,
+                      "users": [
+                        {
+                          "encryption": "none",
+                          "id": "00000000-0000-4000-8000-000000000001"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "network": "tcp",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "allowInsecure": false,
+                    "serverName": "tcp.example.invalid"
+                  }
+                },
+                "tag": "proxy-fi-tcp"
+              }
+            }
+          },
+          {
+            "engine": "xray",
+            "id": "synthetic-fi-grpc",
+            "settings": {
+              "outbound": {
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "grpc.example.invalid",
+                      "port": 443,
+                      "users": [
+                        {
+                          "encryption": "none",
+                          "id": "00000000-0000-4000-8000-000000000002"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "grpcSettings": {
+                    "serviceName": "synthetic-service"
+                  },
+                  "network": "grpc",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "allowInsecure": false,
+                    "serverName": "grpc.example.invalid"
+                  }
+                },
+                "tag": "proxy-fi-grpc"
+              }
+            }
+          },
+          {
+            "engine": "olcrtc",
+            "id": "synthetic-de-olcrtc",
+            "settings": {
+              "bootstrap_dns": "1.1.1.1:53",
+              "key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+              "provider": "jitsi",
+              "room": "https://room.example.invalid/synthetic-rtc",
+              "transport": "datachannel"
+            }
+          },
+          {
+            "engine": "openflux",
+            "id": "synthetic-de-openflux",
+            "settings": {
+              "codec": "batched",
+              "document_url": "synthetic-cups-room",
+              "encryption_secret": "synthetic-test-secret-do-not-use",
+              "transport": "cupsonline"
+            }
+          },
+          {
+            "engine": "xray",
+            "id": "synthetic-native-auto",
+            "settings": {
+              "xray_config": {
+                "dns": {
+                  "servers": [
+                    "1.1.1.1",
+                    "8.8.8.8"
+                  ]
+                },
+                "observatory": {
+                  "enableConcurrency": true,
+                  "probeInterval": "30s",
+                  "probeURL": "https://probe.example.invalid/generate_204",
+                  "subjectSelector": [
+                    "proxy"
+                  ]
+                },
+                "outbounds": [
+                  {
+                    "protocol": "vless",
+                    "settings": {
+                      "vnext": [
+                        {
+                          "address": "tcp.example.invalid",
+                          "port": 443,
+                          "users": [
+                            {
+                              "encryption": "none",
+                              "id": "00000000-0000-4000-8000-000000000001"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "streamSettings": {
+                      "network": "tcp",
+                      "security": "tls",
+                      "tlsSettings": {
+                        "allowInsecure": false,
+                        "serverName": "tcp.example.invalid"
+                      }
+                    },
+                    "tag": "proxy-fi-tcp"
+                  },
+                  {
+                    "protocol": "vless",
+                    "settings": {
+                      "vnext": [
+                        {
+                          "address": "grpc.example.invalid",
+                          "port": 443,
+                          "users": [
+                            {
+                              "encryption": "none",
+                              "id": "00000000-0000-4000-8000-000000000002"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "streamSettings": {
+                      "grpcSettings": {
+                        "serviceName": "synthetic-service"
+                      },
+                      "network": "grpc",
+                      "security": "tls",
+                      "tlsSettings": {
+                        "allowInsecure": false,
+                        "serverName": "grpc.example.invalid"
+                      }
+                    },
+                    "tag": "proxy-fi-grpc"
+                  }
+                ],
+                "routing": {
+                  "balancers": [
+                    {
+                      "fallbackTag": "proxy-fi-tcp",
+                      "selector": [
+                        "proxy"
+                      ],
+                      "strategy": {
+                        "type": "leastLoad"
+                      },
+                      "tag": "synthetic-auto-balancer"
+                    }
+                  ],
+                  "domainStrategy": "AsIs",
+                  "rules": [
+                    {
+                      "balancerTag": "synthetic-auto-balancer",
+                      "network": "tcp,udp",
+                      "type": "field"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ],
+        "format": "salfetka.subscription",
+        "id": "synthetic-subscription",
+        "locations": [
+          {
+            "connection_ids": [
+              "synthetic-native-auto"
+            ],
+            "icon": "🌐",
+            "id": "synthetic-vpn-auto",
+            "kind": "auto",
+            "mode": "vpn",
+            "selection": {
+              "type": "native"
+            },
+            "title": "Авто VPN · политика источника"
+          },
+          {
+            "connection_ids": [
+              "synthetic-fi-tcp",
+              "synthetic-fi-grpc"
+            ],
+            "country": "FI",
+            "icon": "🇫🇮",
+            "id": "synthetic-vpn-fi",
+            "kind": "location",
+            "mode": "vpn",
+            "selection": {
+              "type": "first_working"
+            },
+            "title": "Финляндия"
+          },
+          {
+            "connection_ids": [
+              "synthetic-de-olcrtc"
+            ],
+            "country": "DE",
+            "icon": "🇩🇪",
+            "id": "synthetic-bypass-de-rtc",
+            "kind": "location",
+            "mode": "bypass",
+            "selection": {
+              "type": "first_working"
+            },
+            "title": "Германия #1"
+          },
+          {
+            "connection_ids": [
+              "synthetic-de-openflux"
+            ],
+            "country": "DE",
+            "icon": "🇩🇪",
+            "id": "synthetic-bypass-de-flux",
+            "kind": "location",
+            "mode": "bypass",
+            "selection": {
+              "type": "first_working"
+            },
+            "title": "Германия #2"
+          }
+        ],
+        "network": {
+          "dns_servers": [
+            "1.1.1.1",
+            "8.8.8.8"
+          ],
+          "probe": {
+            "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "expected_status": 204,
+            "ipv4": "198.51.100.10",
+            "url": "https://probe.example.invalid/generate_204"
+          }
+        },
+        "revision": 1,
+        "subscription": {
+          "description": "Пример контракта. Все доступы и адреса вымышленные; подключение не проверяется.",
+          "expires_at": "2030-12-01T00:00:00Z",
+          "title": "САЛФЕТКА · синтетическая подписка",
+          "traffic": [
+            {
+              "download_bytes": 4194304,
+              "limit_bytes": 1073741824,
+              "scope": "subscription",
+              "upload_bytes": 1048576
+            }
+          ]
+        },
+        "valid_until": "2030-11-01T00:00:00Z",
+        "version": 1
+      }
+    },
+    {
+      "name": "unknown_paid_expiry",
+      "input": {
+        "lab": {
+          "schema_version": 1,
+          "catalog_id": "synthetic-lab",
+          "revision": 1,
+          "expires_at": "2030-11-01T00:00:00Z",
+          "profiles": [
+            {
+              "id": "synthetic-fi-tcp",
+              "name": "Synthetic source profile",
+              "mode": "vpn",
+              "exit_country": "FI",
+              "engine": "xray",
+              "settings": {
+                "outbound": {
+                  "tag": "proxy-fi-tcp",
+                  "protocol": "vless",
+                  "settings": {
+                    "vnext": [
+                      {
+                        "address": "tcp.example.invalid",
+                        "port": 443,
+                        "users": [
+                          {
+                            "id": "00000000-0000-4000-8000-000000000001",
+                            "encryption": "none"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "streamSettings": {
+                    "network": "tcp",
+                    "security": "tls",
+                    "tlsSettings": {
+                      "serverName": "tcp.example.invalid",
+                      "allowInsecure": false
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "synthetic-fi-grpc",
+              "name": "Synthetic source profile",
+              "mode": "vpn",
+              "exit_country": "FI",
+              "engine": "xray",
+              "settings": {
+                "outbound": {
+                  "tag": "proxy-fi-grpc",
+                  "protocol": "vless",
+                  "settings": {
+                    "vnext": [
+                      {
+                        "address": "grpc.example.invalid",
+                        "port": 443,
+                        "users": [
+                          {
+                            "id": "00000000-0000-4000-8000-000000000002",
+                            "encryption": "none"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "streamSettings": {
+                    "network": "grpc",
+                    "security": "tls",
+                    "tlsSettings": {
+                      "serverName": "grpc.example.invalid",
+                      "allowInsecure": false
+                    },
+                    "grpcSettings": {
+                      "serviceName": "synthetic-service"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "synthetic-de-olcrtc",
+              "name": "Synthetic source profile",
+              "mode": "bypass",
+              "exit_country": "DE",
+              "engine": "olcrtc",
+              "settings": {
+                "provider": "jitsi",
+                "transport": "datachannel",
+                "room": "https://room.example.invalid/synthetic-rtc",
+                "key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+                "bootstrap_dns": "1.1.1.1:53"
+              }
+            },
+            {
+              "id": "synthetic-de-openflux",
+              "name": "Synthetic source profile",
+              "mode": "bypass",
+              "exit_country": "DE",
+              "engine": "openflux",
+              "settings": {
+                "transport": "cupsonline",
+                "document_url": "synthetic-cups-room",
+                "encryption_secret": "synthetic-test-secret-do-not-use",
+                "codec": "batched"
+              }
+            }
+          ],
+          "dns_servers": [
+            "1.1.1.1",
+            "8.8.8.8"
+          ],
+          "probe": {
+            "url": "https://probe.example.invalid/generate_204",
+            "ipv4": "198.51.100.10",
+            "expected_status": 204,
+            "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "mapping": {
+          "mapping_version": 1,
+          "id": "synthetic-subscription",
+          "revision": 1,
+          "subscription": {
+            "title": "Unknown paid expiry and traffic"
+          },
+          "locations": [
+            {
+              "id": "synthetic-vpn-auto",
+              "mode": "vpn",
+              "kind": "auto",
+              "title": "Авто VPN · политика источника",
+              "icon": "🌐",
+              "connection_ids": [
+                "synthetic-native-auto"
+              ],
+              "selection": {
+                "type": "native"
+              }
+            },
+            {
+              "id": "synthetic-vpn-fi",
+              "mode": "vpn",
+              "kind": "location",
+              "title": "Финляндия",
+              "icon": "🇫🇮",
+              "country": "FI",
+              "connection_ids": [
+                "synthetic-fi-tcp",
+                "synthetic-fi-grpc"
+              ],
+              "selection": {
+                "type": "first_working"
+              }
+            },
+            {
+              "id": "synthetic-bypass-de-rtc",
+              "mode": "bypass",
+              "kind": "location",
+              "title": "Германия #1",
+              "icon": "🇩🇪",
+              "country": "DE",
+              "connection_ids": [
+                "synthetic-de-olcrtc"
+              ],
+              "selection": {
+                "type": "first_working"
+              }
+            },
+            {
+              "id": "synthetic-bypass-de-flux",
+              "mode": "bypass",
+              "kind": "location",
+              "title": "Германия #2",
+              "icon": "🇩🇪",
+              "country": "DE",
+              "connection_ids": [
+                "synthetic-de-openflux"
+              ],
+              "selection": {
+                "type": "first_working"
+              }
+            }
+          ],
+          "native_connection_ids": [
+            "synthetic-native-auto"
+          ]
+        },
+        "native": {
+          "synthetic-native-auto": {
+            "dns": {
+              "servers": [
+                "1.1.1.1",
+                "8.8.8.8"
+              ]
+            },
+            "outbounds": [
+              {
+                "tag": "proxy-fi-tcp",
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "tcp.example.invalid",
+                      "port": 443,
+                      "users": [
+                        {
+                          "id": "00000000-0000-4000-8000-000000000001",
+                          "encryption": "none"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "network": "tcp",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "serverName": "tcp.example.invalid",
+                    "allowInsecure": false
+                  }
+                }
+              },
+              {
+                "tag": "proxy-fi-grpc",
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "grpc.example.invalid",
+                      "port": 443,
+                      "users": [
+                        {
+                          "id": "00000000-0000-4000-8000-000000000002",
+                          "encryption": "none"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "network": "grpc",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "serverName": "grpc.example.invalid",
+                    "allowInsecure": false
+                  },
+                  "grpcSettings": {
+                    "serviceName": "synthetic-service"
+                  }
+                }
+              }
+            ],
+            "routing": {
+              "domainStrategy": "AsIs",
+              "balancers": [
+                {
+                  "tag": "synthetic-auto-balancer",
+                  "selector": [
+                    "proxy"
+                  ],
+                  "fallbackTag": "proxy-fi-tcp",
+                  "strategy": {
+                    "type": "leastPing"
+                  }
+                }
+              ],
+              "rules": [
+                {
+                  "type": "field",
+                  "network": "tcp,udp",
+                  "balancerTag": "synthetic-auto-balancer"
+                }
+              ]
+            },
+            "observatory": {
+              "subjectSelector": [
+                "proxy"
+              ],
+              "probeURL": "https://probe.example.invalid/generate_204",
+              "probeInterval": "30s",
+              "enableConcurrency": true
+            }
+          }
+        },
+        "version": 1,
+        "transport_only_ids": []
+      },
+      "expected": {
+        "connections": [
+          {
+            "engine": "xray",
+            "id": "synthetic-fi-tcp",
+            "settings": {
+              "outbound": {
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "tcp.example.invalid",
+                      "port": 443,
+                      "users": [
+                        {
+                          "encryption": "none",
+                          "id": "00000000-0000-4000-8000-000000000001"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "network": "tcp",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "allowInsecure": false,
+                    "serverName": "tcp.example.invalid"
+                  }
+                },
+                "tag": "proxy-fi-tcp"
+              }
+            }
+          },
+          {
+            "engine": "xray",
+            "id": "synthetic-fi-grpc",
+            "settings": {
+              "outbound": {
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "grpc.example.invalid",
+                      "port": 443,
+                      "users": [
+                        {
+                          "encryption": "none",
+                          "id": "00000000-0000-4000-8000-000000000002"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "grpcSettings": {
+                    "serviceName": "synthetic-service"
+                  },
+                  "network": "grpc",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "allowInsecure": false,
+                    "serverName": "grpc.example.invalid"
+                  }
+                },
+                "tag": "proxy-fi-grpc"
+              }
+            }
+          },
+          {
+            "engine": "olcrtc",
+            "id": "synthetic-de-olcrtc",
+            "settings": {
+              "bootstrap_dns": "1.1.1.1:53",
+              "key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+              "provider": "jitsi",
+              "room": "https://room.example.invalid/synthetic-rtc",
+              "transport": "datachannel"
+            }
+          },
+          {
+            "engine": "openflux",
+            "id": "synthetic-de-openflux",
+            "settings": {
+              "codec": "batched",
+              "document_url": "synthetic-cups-room",
+              "encryption_secret": "synthetic-test-secret-do-not-use",
+              "transport": "cupsonline"
+            }
+          },
+          {
+            "engine": "xray",
+            "id": "synthetic-native-auto",
+            "settings": {
+              "xray_config": {
+                "dns": {
+                  "servers": [
+                    "1.1.1.1",
+                    "8.8.8.8"
+                  ]
+                },
+                "observatory": {
+                  "enableConcurrency": true,
+                  "probeInterval": "30s",
+                  "probeURL": "https://probe.example.invalid/generate_204",
+                  "subjectSelector": [
+                    "proxy"
+                  ]
+                },
+                "outbounds": [
+                  {
+                    "protocol": "vless",
+                    "settings": {
+                      "vnext": [
+                        {
+                          "address": "tcp.example.invalid",
+                          "port": 443,
+                          "users": [
+                            {
+                              "encryption": "none",
+                              "id": "00000000-0000-4000-8000-000000000001"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "streamSettings": {
+                      "network": "tcp",
+                      "security": "tls",
+                      "tlsSettings": {
+                        "allowInsecure": false,
+                        "serverName": "tcp.example.invalid"
+                      }
+                    },
+                    "tag": "proxy-fi-tcp"
+                  },
+                  {
+                    "protocol": "vless",
+                    "settings": {
+                      "vnext": [
+                        {
+                          "address": "grpc.example.invalid",
+                          "port": 443,
+                          "users": [
+                            {
+                              "encryption": "none",
+                              "id": "00000000-0000-4000-8000-000000000002"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "streamSettings": {
+                      "grpcSettings": {
+                        "serviceName": "synthetic-service"
+                      },
+                      "network": "grpc",
+                      "security": "tls",
+                      "tlsSettings": {
+                        "allowInsecure": false,
+                        "serverName": "grpc.example.invalid"
+                      }
+                    },
+                    "tag": "proxy-fi-grpc"
+                  }
+                ],
+                "routing": {
+                  "balancers": [
+                    {
+                      "fallbackTag": "proxy-fi-tcp",
+                      "selector": [
+                        "proxy"
+                      ],
+                      "strategy": {
+                        "type": "leastPing"
+                      },
+                      "tag": "synthetic-auto-balancer"
+                    }
+                  ],
+                  "domainStrategy": "AsIs",
+                  "rules": [
+                    {
+                      "balancerTag": "synthetic-auto-balancer",
+                      "network": "tcp,udp",
+                      "type": "field"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ],
+        "format": "salfetka.subscription",
+        "id": "synthetic-subscription",
+        "locations": [
+          {
+            "connection_ids": [
+              "synthetic-native-auto"
+            ],
+            "icon": "🌐",
+            "id": "synthetic-vpn-auto",
+            "kind": "auto",
+            "mode": "vpn",
+            "selection": {
+              "type": "native"
+            },
+            "title": "Авто VPN · политика источника"
+          },
+          {
+            "connection_ids": [
+              "synthetic-fi-tcp",
+              "synthetic-fi-grpc"
+            ],
+            "country": "FI",
+            "icon": "🇫🇮",
+            "id": "synthetic-vpn-fi",
+            "kind": "location",
+            "mode": "vpn",
+            "selection": {
+              "type": "first_working"
+            },
+            "title": "Финляндия"
+          },
+          {
+            "connection_ids": [
+              "synthetic-de-olcrtc"
+            ],
+            "country": "DE",
+            "icon": "🇩🇪",
+            "id": "synthetic-bypass-de-rtc",
+            "kind": "location",
+            "mode": "bypass",
+            "selection": {
+              "type": "first_working"
+            },
+            "title": "Германия #1"
+          },
+          {
+            "connection_ids": [
+              "synthetic-de-openflux"
+            ],
+            "country": "DE",
+            "icon": "🇩🇪",
+            "id": "synthetic-bypass-de-flux",
+            "kind": "location",
+            "mode": "bypass",
+            "selection": {
+              "type": "first_working"
+            },
+            "title": "Германия #2"
+          }
+        ],
+        "network": {
+          "dns_servers": [
+            "1.1.1.1",
+            "8.8.8.8"
+          ],
+          "probe": {
+            "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "expected_status": 204,
+            "ipv4": "198.51.100.10",
+            "url": "https://probe.example.invalid/generate_204"
+          }
+        },
+        "revision": 1,
+        "subscription": {
+          "title": "Unknown paid expiry and traffic"
+        },
+        "valid_until": "2030-11-01T00:00:00Z",
+        "version": 1
+      }
+    },
+    {
+      "name": "explicit_order",
+      "input": {
+        "lab": {
+          "schema_version": 1,
+          "catalog_id": "synthetic-lab",
+          "revision": 1,
+          "expires_at": "2030-11-01T00:00:00Z",
+          "profiles": [
+            {
+              "id": "synthetic-de-openflux",
+              "name": "Synthetic source profile",
+              "mode": "bypass",
+              "exit_country": "DE",
+              "engine": "openflux",
+              "settings": {
+                "transport": "cupsonline",
+                "document_url": "synthetic-cups-room",
+                "encryption_secret": "synthetic-test-secret-do-not-use",
+                "codec": "batched"
+              }
+            },
+            {
+              "id": "synthetic-de-olcrtc",
+              "name": "Synthetic source profile",
+              "mode": "bypass",
+              "exit_country": "DE",
+              "engine": "olcrtc",
+              "settings": {
+                "provider": "jitsi",
+                "transport": "datachannel",
+                "room": "https://room.example.invalid/synthetic-rtc",
+                "key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+                "bootstrap_dns": "1.1.1.1:53"
+              }
+            },
+            {
+              "id": "synthetic-fi-grpc",
+              "name": "Synthetic source profile",
+              "mode": "vpn",
+              "exit_country": "FI",
+              "engine": "xray",
+              "settings": {
+                "outbound": {
+                  "tag": "proxy-fi-grpc",
+                  "protocol": "vless",
+                  "settings": {
+                    "vnext": [
+                      {
+                        "address": "grpc.example.invalid",
+                        "port": 443,
+                        "users": [
+                          {
+                            "id": "00000000-0000-4000-8000-000000000002",
+                            "encryption": "none"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "streamSettings": {
+                    "network": "grpc",
+                    "security": "tls",
+                    "tlsSettings": {
+                      "serverName": "grpc.example.invalid",
+                      "allowInsecure": false
+                    },
+                    "grpcSettings": {
+                      "serviceName": "synthetic-service"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "synthetic-fi-tcp",
+              "name": "Synthetic source profile",
+              "mode": "vpn",
+              "exit_country": "FI",
+              "engine": "xray",
+              "settings": {
+                "outbound": {
+                  "tag": "proxy-fi-tcp",
+                  "protocol": "vless",
+                  "settings": {
+                    "vnext": [
+                      {
+                        "address": "tcp.example.invalid",
+                        "port": 443,
+                        "users": [
+                          {
+                            "id": "00000000-0000-4000-8000-000000000001",
+                            "encryption": "none"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "streamSettings": {
+                    "network": "tcp",
+                    "security": "tls",
+                    "tlsSettings": {
+                      "serverName": "tcp.example.invalid",
+                      "allowInsecure": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "dns_servers": [
+            "1.1.1.1",
+            "8.8.8.8"
+          ],
+          "probe": {
+            "url": "https://probe.example.invalid/generate_204",
+            "ipv4": "198.51.100.10",
+            "expected_status": 204,
+            "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "mapping": {
+          "mapping_version": 1,
+          "id": "synthetic-subscription",
+          "revision": 1,
+          "subscription": {
+            "title": "САЛФЕТКА · синтетическая подписка",
+            "description": "Пример контракта. Все доступы и адреса вымышленные; подключение не проверяется.",
+            "expires_at": "2030-12-01T00:00:00Z",
+            "traffic": [
+              {
+                "scope": "subscription",
+                "upload_bytes": 1048576,
+                "download_bytes": 4194304,
+                "limit_bytes": 1073741824
+              }
+            ]
+          },
+          "locations": [
+            {
+              "id": "synthetic-bypass-de-flux",
+              "mode": "bypass",
+              "kind": "location",
+              "title": "Германия #2",
+              "icon": "🇩🇪",
+              "country": "DE",
+              "connection_ids": [
+                "synthetic-de-openflux"
+              ],
+              "selection": {
+                "type": "first_working"
+              }
+            },
+            {
+              "id": "synthetic-bypass-de-rtc",
+              "mode": "bypass",
+              "kind": "location",
+              "title": "Германия #1",
+              "icon": "🇩🇪",
+              "country": "DE",
+              "connection_ids": [
+                "synthetic-de-olcrtc"
+              ],
+              "selection": {
+                "type": "first_working"
+              }
+            },
+            {
+              "id": "synthetic-vpn-fi",
+              "mode": "vpn",
+              "kind": "location",
+              "title": "Финляндия",
+              "icon": "🇫🇮",
+              "country": "FI",
+              "connection_ids": [
+                "synthetic-fi-grpc",
+                "synthetic-fi-tcp"
+              ],
+              "selection": {
+                "type": "first_working"
+              }
+            },
+            {
+              "id": "synthetic-vpn-auto",
+              "mode": "vpn",
+              "kind": "auto",
+              "title": "Авто VPN · политика источника",
+              "icon": "🌐",
+              "connection_ids": [
+                "synthetic-native-auto"
+              ],
+              "selection": {
+                "type": "native"
+              }
+            }
+          ],
+          "native_connection_ids": [
+            "synthetic-native-auto"
+          ]
+        },
+        "native": {
+          "synthetic-native-auto": {
+            "dns": {
+              "servers": [
+                "1.1.1.1",
+                "8.8.8.8"
+              ]
+            },
+            "outbounds": [
+              {
+                "tag": "proxy-fi-tcp",
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "tcp.example.invalid",
+                      "port": 443,
+                      "users": [
+                        {
+                          "id": "00000000-0000-4000-8000-000000000001",
+                          "encryption": "none"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "network": "tcp",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "serverName": "tcp.example.invalid",
+                    "allowInsecure": false
+                  }
+                }
+              },
+              {
+                "tag": "proxy-fi-grpc",
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "grpc.example.invalid",
+                      "port": 443,
+                      "users": [
+                        {
+                          "id": "00000000-0000-4000-8000-000000000002",
+                          "encryption": "none"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "network": "grpc",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "serverName": "grpc.example.invalid",
+                    "allowInsecure": false
+                  },
+                  "grpcSettings": {
+                    "serviceName": "synthetic-service"
+                  }
+                }
+              }
+            ],
+            "routing": {
+              "domainStrategy": "AsIs",
+              "balancers": [
+                {
+                  "tag": "synthetic-auto-balancer",
+                  "selector": [
+                    "proxy"
+                  ],
+                  "fallbackTag": "proxy-fi-tcp",
+                  "strategy": {
+                    "type": "leastPing"
+                  }
+                }
+              ],
+              "rules": [
+                {
+                  "type": "field",
+                  "network": "tcp,udp",
+                  "balancerTag": "synthetic-auto-balancer"
+                }
+              ]
+            },
+            "observatory": {
+              "subjectSelector": [
+                "proxy"
+              ],
+              "probeURL": "https://probe.example.invalid/generate_204",
+              "probeInterval": "30s",
+              "enableConcurrency": true
+            }
+          }
+        },
+        "version": 1,
+        "transport_only_ids": []
+      },
+      "expected": {
+        "connections": [
+          {
+            "engine": "openflux",
+            "id": "synthetic-de-openflux",
+            "settings": {
+              "codec": "batched",
+              "document_url": "synthetic-cups-room",
+              "encryption_secret": "synthetic-test-secret-do-not-use",
+              "transport": "cupsonline"
+            }
+          },
+          {
+            "engine": "olcrtc",
+            "id": "synthetic-de-olcrtc",
+            "settings": {
+              "bootstrap_dns": "1.1.1.1:53",
+              "key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+              "provider": "jitsi",
+              "room": "https://room.example.invalid/synthetic-rtc",
+              "transport": "datachannel"
+            }
+          },
+          {
+            "engine": "xray",
+            "id": "synthetic-fi-grpc",
+            "settings": {
+              "outbound": {
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "grpc.example.invalid",
+                      "port": 443,
+                      "users": [
+                        {
+                          "encryption": "none",
+                          "id": "00000000-0000-4000-8000-000000000002"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "grpcSettings": {
+                    "serviceName": "synthetic-service"
+                  },
+                  "network": "grpc",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "allowInsecure": false,
+                    "serverName": "grpc.example.invalid"
+                  }
+                },
+                "tag": "proxy-fi-grpc"
+              }
+            }
+          },
+          {
+            "engine": "xray",
+            "id": "synthetic-fi-tcp",
+            "settings": {
+              "outbound": {
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "tcp.example.invalid",
+                      "port": 443,
+                      "users": [
+                        {
+                          "encryption": "none",
+                          "id": "00000000-0000-4000-8000-000000000001"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "network": "tcp",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "allowInsecure": false,
+                    "serverName": "tcp.example.invalid"
+                  }
+                },
+                "tag": "proxy-fi-tcp"
+              }
+            }
+          },
+          {
+            "engine": "xray",
+            "id": "synthetic-native-auto",
+            "settings": {
+              "xray_config": {
+                "dns": {
+                  "servers": [
+                    "1.1.1.1",
+                    "8.8.8.8"
+                  ]
+                },
+                "observatory": {
+                  "enableConcurrency": true,
+                  "probeInterval": "30s",
+                  "probeURL": "https://probe.example.invalid/generate_204",
+                  "subjectSelector": [
+                    "proxy"
+                  ]
+                },
+                "outbounds": [
+                  {
+                    "protocol": "vless",
+                    "settings": {
+                      "vnext": [
+                        {
+                          "address": "tcp.example.invalid",
+                          "port": 443,
+                          "users": [
+                            {
+                              "encryption": "none",
+                              "id": "00000000-0000-4000-8000-000000000001"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "streamSettings": {
+                      "network": "tcp",
+                      "security": "tls",
+                      "tlsSettings": {
+                        "allowInsecure": false,
+                        "serverName": "tcp.example.invalid"
+                      }
+                    },
+                    "tag": "proxy-fi-tcp"
+                  },
+                  {
+                    "protocol": "vless",
+                    "settings": {
+                      "vnext": [
+                        {
+                          "address": "grpc.example.invalid",
+                          "port": 443,
+                          "users": [
+                            {
+                              "encryption": "none",
+                              "id": "00000000-0000-4000-8000-000000000002"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "streamSettings": {
+                      "grpcSettings": {
+                        "serviceName": "synthetic-service"
+                      },
+                      "network": "grpc",
+                      "security": "tls",
+                      "tlsSettings": {
+                        "allowInsecure": false,
+                        "serverName": "grpc.example.invalid"
+                      }
+                    },
+                    "tag": "proxy-fi-grpc"
+                  }
+                ],
+                "routing": {
+                  "balancers": [
+                    {
+                      "fallbackTag": "proxy-fi-tcp",
+                      "selector": [
+                        "proxy"
+                      ],
+                      "strategy": {
+                        "type": "leastPing"
+                      },
+                      "tag": "synthetic-auto-balancer"
+                    }
+                  ],
+                  "domainStrategy": "AsIs",
+                  "rules": [
+                    {
+                      "balancerTag": "synthetic-auto-balancer",
+                      "network": "tcp,udp",
+                      "type": "field"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ],
+        "format": "salfetka.subscription",
+        "id": "synthetic-subscription",
+        "locations": [
+          {
+            "connection_ids": [
+              "synthetic-de-openflux"
+            ],
+            "country": "DE",
+            "icon": "🇩🇪",
+            "id": "synthetic-bypass-de-flux",
+            "kind": "location",
+            "mode": "bypass",
+            "selection": {
+              "type": "first_working"
+            },
+            "title": "Германия #2"
+          },
+          {
+            "connection_ids": [
+              "synthetic-de-olcrtc"
+            ],
+            "country": "DE",
+            "icon": "🇩🇪",
+            "id": "synthetic-bypass-de-rtc",
+            "kind": "location",
+            "mode": "bypass",
+            "selection": {
+              "type": "first_working"
+            },
+            "title": "Германия #1"
+          },
+          {
+            "connection_ids": [
+              "synthetic-fi-grpc",
+              "synthetic-fi-tcp"
+            ],
+            "country": "FI",
+            "icon": "🇫🇮",
+            "id": "synthetic-vpn-fi",
+            "kind": "location",
+            "mode": "vpn",
+            "selection": {
+              "type": "first_working"
+            },
+            "title": "Финляндия"
+          },
+          {
+            "connection_ids": [
+              "synthetic-native-auto"
+            ],
+            "icon": "🌐",
+            "id": "synthetic-vpn-auto",
+            "kind": "auto",
+            "mode": "vpn",
+            "selection": {
+              "type": "native"
+            },
+            "title": "Авто VPN · политика источника"
+          }
+        ],
+        "network": {
+          "dns_servers": [
+            "1.1.1.1",
+            "8.8.8.8"
+          ],
+          "probe": {
+            "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "expected_status": 204,
+            "ipv4": "198.51.100.10",
+            "url": "https://probe.example.invalid/generate_204"
+          }
+        },
+        "revision": 1,
+        "subscription": {
+          "description": "Пример контракта. Все доступы и адреса вымышленные; подключение не проверяется.",
+          "expires_at": "2030-12-01T00:00:00Z",
+          "title": "САЛФЕТКА · синтетическая подписка",
+          "traffic": [
+            {
+              "download_bytes": 4194304,
+              "limit_bytes": 1073741824,
+              "scope": "subscription",
+              "upload_bytes": 1048576
+            }
+          ]
+        },
+        "valid_until": "2030-11-01T00:00:00Z",
+        "version": 1
+      }
+    },
+    {
+      "name": "v2_transport_only",
+      "input": {
+        "lab": {
+          "schema_version": 1,
+          "catalog_id": "synthetic-lab",
+          "revision": 1,
+          "expires_at": "2030-11-01T00:00:00Z",
+          "profiles": [
+            {
+              "id": "synthetic-fi-tcp",
+              "name": "Synthetic source profile",
+              "mode": "vpn",
+              "exit_country": "FI",
+              "engine": "xray",
+              "settings": {
+                "outbound": {
+                  "tag": "proxy-fi-tcp",
+                  "protocol": "vless",
+                  "settings": {
+                    "vnext": [
+                      {
+                        "address": "tcp.example.invalid",
+                        "port": 443,
+                        "users": [
+                          {
+                            "id": "00000000-0000-4000-8000-000000000001",
+                            "encryption": "none"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "streamSettings": {
+                    "network": "tcp",
+                    "security": "tls",
+                    "tlsSettings": {
+                      "serverName": "tcp.example.invalid",
+                      "allowInsecure": false
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "synthetic-fi-grpc",
+              "name": "Synthetic source profile",
+              "mode": "vpn",
+              "exit_country": "FI",
+              "engine": "xray",
+              "settings": {
+                "outbound": {
+                  "tag": "proxy-fi-grpc",
+                  "protocol": "vless",
+                  "settings": {
+                    "vnext": [
+                      {
+                        "address": "grpc.example.invalid",
+                        "port": 443,
+                        "users": [
+                          {
+                            "id": "00000000-0000-4000-8000-000000000002",
+                            "encryption": "none"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "streamSettings": {
+                    "network": "grpc",
+                    "security": "tls",
+                    "tlsSettings": {
+                      "serverName": "grpc.example.invalid",
+                      "allowInsecure": false
+                    },
+                    "grpcSettings": {
+                      "serviceName": "synthetic-service"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "synthetic-de-olcrtc",
+              "name": "Synthetic source profile",
+              "mode": "bypass",
+              "exit_country": "DE",
+              "engine": "olcrtc",
+              "settings": {
+                "provider": "jitsi",
+                "transport": "datachannel",
+                "room": "https://room.example.invalid/synthetic-rtc",
+                "key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+                "bootstrap_dns": "1.1.1.1:53"
+              }
+            },
+            {
+              "id": "synthetic-de-openflux",
+              "name": "Synthetic source profile",
+              "mode": "bypass",
+              "exit_country": "DE",
+              "engine": "openflux",
+              "settings": {
+                "transport": "cupsonline",
+                "document_url": "synthetic-cups-room",
+                "encryption_secret": "synthetic-test-secret-do-not-use",
+                "codec": "batched"
+              }
+            }
+          ],
+          "dns_servers": [
+            "1.1.1.1",
+            "8.8.8.8"
+          ],
+          "probe": {
+            "url": "https://probe.example.invalid/generate_204",
+            "ipv4": "198.51.100.10",
+            "expected_status": 204,
+            "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "mapping": {
+          "mapping_version": 1,
+          "id": "synthetic-subscription",
+          "revision": 1,
+          "subscription": {
+            "title": "САЛФЕТКА · синтетическая подписка",
+            "description": "Пример контракта. Все доступы и адреса вымышленные; подключение не проверяется.",
+            "expires_at": "2030-12-01T00:00:00Z",
+            "traffic": [
+              {
+                "scope": "subscription",
+                "upload_bytes": 1048576,
+                "download_bytes": 4194304,
+                "limit_bytes": 1073741824
+              }
+            ]
+          },
+          "locations": [
+            {
+              "id": "synthetic-vpn-auto",
+              "mode": "vpn",
+              "kind": "auto",
+              "title": "Авто VPN · политика источника",
+              "icon": "🌐",
+              "connection_ids": [
+                "synthetic-native-auto"
+              ],
+              "selection": {
+                "type": "native"
+              }
+            },
+            {
+              "id": "synthetic-vpn-fi",
+              "mode": "vpn",
+              "kind": "location",
+              "title": "Финляндия",
+              "icon": "🇫🇮",
+              "country": "FI",
+              "connection_ids": [
+                "synthetic-fi-tcp",
+                "synthetic-fi-grpc"
+              ],
+              "selection": {
+                "type": "first_working"
+              }
+            },
+            {
+              "id": "synthetic-bypass-de-rtc",
+              "mode": "bypass",
+              "kind": "location",
+              "title": "Германия #1",
+              "icon": "🇩🇪",
+              "country": "DE",
+              "connection_ids": [
+                "synthetic-de-olcrtc"
+              ],
+              "selection": {
+                "type": "first_working"
+              }
+            },
+            {
+              "id": "synthetic-bypass-de-flux",
+              "mode": "bypass",
+              "kind": "location",
+              "title": "Германия #2",
+              "icon": "🇩🇪",
+              "country": "DE",
+              "connection_ids": [
+                "synthetic-de-openflux"
+              ],
+              "selection": {
+                "type": "first_working"
+              }
+            }
+          ],
+          "native_connection_ids": [
+            "synthetic-native-auto"
+          ]
+        },
+        "native": {
+          "synthetic-native-auto": {
+            "dns": {
+              "servers": [
+                "1.1.1.1",
+                "8.8.8.8"
+              ]
+            },
+            "outbounds": [
+              {
+                "tag": "proxy-fi-tcp",
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "tcp.example.invalid",
+                      "port": 443,
+                      "users": [
+                        {
+                          "id": "00000000-0000-4000-8000-000000000001",
+                          "encryption": "none"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "network": "tcp",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "serverName": "tcp.example.invalid",
+                    "allowInsecure": false
+                  }
+                }
+              },
+              {
+                "tag": "proxy-fi-grpc",
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "grpc.example.invalid",
+                      "port": 443,
+                      "users": [
+                        {
+                          "id": "00000000-0000-4000-8000-000000000002",
+                          "encryption": "none"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "network": "grpc",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "serverName": "grpc.example.invalid",
+                    "allowInsecure": false
+                  },
+                  "grpcSettings": {
+                    "serviceName": "synthetic-service"
+                  }
+                }
+              }
+            ],
+            "routing": {
+              "domainStrategy": "AsIs",
+              "balancers": [
+                {
+                  "tag": "synthetic-auto-balancer",
+                  "selector": [
+                    "proxy"
+                  ],
+                  "fallbackTag": "proxy-fi-tcp",
+                  "strategy": {
+                    "type": "leastPing"
+                  }
+                }
+              ],
+              "rules": [
+                {
+                  "type": "field",
+                  "network": "tcp,udp",
+                  "balancerTag": "synthetic-auto-balancer"
+                }
+              ]
+            },
+            "observatory": {
+              "subjectSelector": [
+                "proxy"
+              ],
+              "probeURL": "https://probe.example.invalid/generate_204",
+              "probeInterval": "30s",
+              "enableConcurrency": true
+            }
+          }
+        },
+        "version": 2,
+        "transport_only_ids": [
+          "synthetic-native-auto"
+        ]
+      },
+      "expected": {
+        "connections": [
+          {
+            "engine": "xray",
+            "id": "synthetic-fi-tcp",
+            "settings": {
+              "outbound": {
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "tcp.example.invalid",
+                      "port": 443,
+                      "users": [
+                        {
+                          "encryption": "none",
+                          "id": "00000000-0000-4000-8000-000000000001"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "network": "tcp",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "allowInsecure": false,
+                    "serverName": "tcp.example.invalid"
+                  }
+                },
+                "tag": "proxy-fi-tcp"
+              }
+            }
+          },
+          {
+            "engine": "xray",
+            "id": "synthetic-fi-grpc",
+            "settings": {
+              "outbound": {
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "grpc.example.invalid",
+                      "port": 443,
+                      "users": [
+                        {
+                          "encryption": "none",
+                          "id": "00000000-0000-4000-8000-000000000002"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "grpcSettings": {
+                    "serviceName": "synthetic-service"
+                  },
+                  "network": "grpc",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "allowInsecure": false,
+                    "serverName": "grpc.example.invalid"
+                  }
+                },
+                "tag": "proxy-fi-grpc"
+              }
+            }
+          },
+          {
+            "engine": "olcrtc",
+            "id": "synthetic-de-olcrtc",
+            "settings": {
+              "bootstrap_dns": "1.1.1.1:53",
+              "key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+              "provider": "jitsi",
+              "room": "https://room.example.invalid/synthetic-rtc",
+              "transport": "datachannel"
+            }
+          },
+          {
+            "engine": "openflux",
+            "id": "synthetic-de-openflux",
+            "settings": {
+              "codec": "batched",
+              "document_url": "synthetic-cups-room",
+              "encryption_secret": "synthetic-test-secret-do-not-use",
+              "transport": "cupsonline"
+            }
+          },
+          {
+            "engine": "xray",
+            "id": "synthetic-native-auto",
+            "routing_role": "transport_only",
+            "settings": {
+              "xray_config": {
+                "dns": {
+                  "servers": [
+                    "1.1.1.1",
+                    "8.8.8.8"
+                  ]
+                },
+                "observatory": {
+                  "enableConcurrency": true,
+                  "probeInterval": "30s",
+                  "probeURL": "https://probe.example.invalid/generate_204",
+                  "subjectSelector": [
+                    "proxy"
+                  ]
+                },
+                "outbounds": [
+                  {
+                    "protocol": "vless",
+                    "settings": {
+                      "vnext": [
+                        {
+                          "address": "tcp.example.invalid",
+                          "port": 443,
+                          "users": [
+                            {
+                              "encryption": "none",
+                              "id": "00000000-0000-4000-8000-000000000001"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "streamSettings": {
+                      "network": "tcp",
+                      "security": "tls",
+                      "tlsSettings": {
+                        "allowInsecure": false,
+                        "serverName": "tcp.example.invalid"
+                      }
+                    },
+                    "tag": "proxy-fi-tcp"
+                  },
+                  {
+                    "protocol": "vless",
+                    "settings": {
+                      "vnext": [
+                        {
+                          "address": "grpc.example.invalid",
+                          "port": 443,
+                          "users": [
+                            {
+                              "encryption": "none",
+                              "id": "00000000-0000-4000-8000-000000000002"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "streamSettings": {
+                      "grpcSettings": {
+                        "serviceName": "synthetic-service"
+                      },
+                      "network": "grpc",
+                      "security": "tls",
+                      "tlsSettings": {
+                        "allowInsecure": false,
+                        "serverName": "grpc.example.invalid"
+                      }
+                    },
+                    "tag": "proxy-fi-grpc"
+                  }
+                ],
+                "routing": {
+                  "balancers": [
+                    {
+                      "fallbackTag": "proxy-fi-tcp",
+                      "selector": [
+                        "proxy"
+                      ],
+                      "strategy": {
+                        "type": "leastPing"
+                      },
+                      "tag": "synthetic-auto-balancer"
+                    }
+                  ],
+                  "domainStrategy": "AsIs",
+                  "rules": [
+                    {
+                      "balancerTag": "synthetic-auto-balancer",
+                      "network": "tcp,udp",
+                      "type": "field"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ],
+        "format": "salfetka.subscription",
+        "id": "synthetic-subscription",
+        "locations": [
+          {
+            "connection_ids": [
+              "synthetic-native-auto"
+            ],
+            "icon": "🌐",
+            "id": "synthetic-vpn-auto",
+            "kind": "auto",
+            "mode": "vpn",
+            "selection": {
+              "type": "native"
+            },
+            "title": "Авто VPN · политика источника"
+          },
+          {
+            "connection_ids": [
+              "synthetic-fi-tcp",
+              "synthetic-fi-grpc"
+            ],
+            "country": "FI",
+            "icon": "🇫🇮",
+            "id": "synthetic-vpn-fi",
+            "kind": "location",
+            "mode": "vpn",
+            "selection": {
+              "type": "first_working"
+            },
+            "title": "Финляндия"
+          },
+          {
+            "connection_ids": [
+              "synthetic-de-olcrtc"
+            ],
+            "country": "DE",
+            "icon": "🇩🇪",
+            "id": "synthetic-bypass-de-rtc",
+            "kind": "location",
+            "mode": "bypass",
+            "selection": {
+              "type": "first_working"
+            },
+            "title": "Германия #1"
+          },
+          {
+            "connection_ids": [
+              "synthetic-de-openflux"
+            ],
+            "country": "DE",
+            "icon": "🇩🇪",
+            "id": "synthetic-bypass-de-flux",
+            "kind": "location",
+            "mode": "bypass",
+            "selection": {
+              "type": "first_working"
+            },
+            "title": "Германия #2"
+          }
+        ],
+        "network": {
+          "dns_servers": [
+            "1.1.1.1",
+            "8.8.8.8"
+          ],
+          "probe": {
+            "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "expected_status": 204,
+            "ipv4": "198.51.100.10",
+            "url": "https://probe.example.invalid/generate_204"
+          }
+        },
+        "revision": 1,
+        "subscription": {
+          "description": "Пример контракта. Все доступы и адреса вымышленные; подключение не проверяется.",
+          "expires_at": "2030-12-01T00:00:00Z",
+          "title": "САЛФЕТКА · синтетическая подписка",
+          "traffic": [
+            {
+              "download_bytes": 4194304,
+              "limit_bytes": 1073741824,
+              "scope": "subscription",
+              "upload_bytes": 1048576
+            }
+          ]
+        },
+        "valid_until": "2030-11-01T00:00:00Z",
+        "version": 2
+      }
+    },
+    {
+      "name": "v2_source_empty_rules",
+      "input": {
+        "lab": {
+          "schema_version": 1,
+          "catalog_id": "synthetic-lab",
+          "revision": 1,
+          "expires_at": "2030-11-01T00:00:00Z",
+          "profiles": [
+            {
+              "id": "synthetic-fi-tcp",
+              "name": "Synthetic source profile",
+              "mode": "vpn",
+              "exit_country": "FI",
+              "engine": "xray",
+              "settings": {
+                "outbound": {
+                  "tag": "proxy-fi-tcp",
+                  "protocol": "vless",
+                  "settings": {
+                    "vnext": [
+                      {
+                        "address": "tcp.example.invalid",
+                        "port": 443,
+                        "users": [
+                          {
+                            "id": "00000000-0000-4000-8000-000000000001",
+                            "encryption": "none"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "streamSettings": {
+                    "network": "tcp",
+                    "security": "tls",
+                    "tlsSettings": {
+                      "serverName": "tcp.example.invalid",
+                      "allowInsecure": false
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "synthetic-fi-grpc",
+              "name": "Synthetic source profile",
+              "mode": "vpn",
+              "exit_country": "FI",
+              "engine": "xray",
+              "settings": {
+                "outbound": {
+                  "tag": "proxy-fi-grpc",
+                  "protocol": "vless",
+                  "settings": {
+                    "vnext": [
+                      {
+                        "address": "grpc.example.invalid",
+                        "port": 443,
+                        "users": [
+                          {
+                            "id": "00000000-0000-4000-8000-000000000002",
+                            "encryption": "none"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "streamSettings": {
+                    "network": "grpc",
+                    "security": "tls",
+                    "tlsSettings": {
+                      "serverName": "grpc.example.invalid",
+                      "allowInsecure": false
+                    },
+                    "grpcSettings": {
+                      "serviceName": "synthetic-service"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "synthetic-de-olcrtc",
+              "name": "Synthetic source profile",
+              "mode": "bypass",
+              "exit_country": "DE",
+              "engine": "olcrtc",
+              "settings": {
+                "provider": "jitsi",
+                "transport": "datachannel",
+                "room": "https://room.example.invalid/synthetic-rtc",
+                "key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+                "bootstrap_dns": "1.1.1.1:53"
+              }
+            },
+            {
+              "id": "synthetic-de-openflux",
+              "name": "Synthetic source profile",
+              "mode": "bypass",
+              "exit_country": "DE",
+              "engine": "openflux",
+              "settings": {
+                "transport": "cupsonline",
+                "document_url": "synthetic-cups-room",
+                "encryption_secret": "synthetic-test-secret-do-not-use",
+                "codec": "batched"
+              }
+            }
+          ],
+          "dns_servers": [
+            "1.1.1.1",
+            "8.8.8.8"
+          ],
+          "probe": {
+            "url": "https://probe.example.invalid/generate_204",
+            "ipv4": "198.51.100.10",
+            "expected_status": 204,
+            "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "mapping": {
+          "mapping_version": 1,
+          "id": "synthetic-subscription",
+          "revision": 1,
+          "subscription": {
+            "title": "САЛФЕТКА · синтетическая подписка",
+            "description": "Пример контракта. Все доступы и адреса вымышленные; подключение не проверяется.",
+            "expires_at": "2030-12-01T00:00:00Z",
+            "traffic": [
+              {
+                "scope": "subscription",
+                "upload_bytes": 1048576,
+                "download_bytes": 4194304,
+                "limit_bytes": 1073741824
+              }
+            ]
+          },
+          "locations": [
+            {
+              "id": "synthetic-vpn-auto",
+              "mode": "vpn",
+              "kind": "auto",
+              "title": "Авто VPN · политика источника",
+              "icon": "🌐",
+              "connection_ids": [
+                "synthetic-native-auto"
+              ],
+              "selection": {
+                "type": "native"
+              }
+            },
+            {
+              "id": "synthetic-vpn-fi",
+              "mode": "vpn",
+              "kind": "location",
+              "title": "Финляндия",
+              "icon": "🇫🇮",
+              "country": "FI",
+              "connection_ids": [
+                "synthetic-fi-tcp",
+                "synthetic-fi-grpc"
+              ],
+              "selection": {
+                "type": "first_working"
+              }
+            },
+            {
+              "id": "synthetic-bypass-de-rtc",
+              "mode": "bypass",
+              "kind": "location",
+              "title": "Германия #1",
+              "icon": "🇩🇪",
+              "country": "DE",
+              "connection_ids": [
+                "synthetic-de-olcrtc"
+              ],
+              "selection": {
+                "type": "first_working"
+              }
+            },
+            {
+              "id": "synthetic-bypass-de-flux",
+              "mode": "bypass",
+              "kind": "location",
+              "title": "Германия #2",
+              "icon": "🇩🇪",
+              "country": "DE",
+              "connection_ids": [
+                "synthetic-de-openflux"
+              ],
+              "selection": {
+                "type": "first_working"
+              }
+            }
+          ],
+          "native_connection_ids": [
+            "synthetic-native-auto"
+          ]
+        },
+        "native": {
+          "synthetic-native-auto": {
+            "dns": {
+              "servers": [
+                "1.1.1.1",
+                "8.8.8.8"
+              ]
+            },
+            "outbounds": [
+              {
+                "tag": "proxy-fi-tcp",
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "tcp.example.invalid",
+                      "port": 443,
+                      "users": [
+                        {
+                          "id": "00000000-0000-4000-8000-000000000001",
+                          "encryption": "none"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "network": "tcp",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "serverName": "tcp.example.invalid",
+                    "allowInsecure": false
+                  }
+                }
+              },
+              {
+                "tag": "proxy-fi-grpc",
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "grpc.example.invalid",
+                      "port": 443,
+                      "users": [
+                        {
+                          "id": "00000000-0000-4000-8000-000000000002",
+                          "encryption": "none"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "network": "grpc",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "serverName": "grpc.example.invalid",
+                    "allowInsecure": false
+                  },
+                  "grpcSettings": {
+                    "serviceName": "synthetic-service"
+                  }
+                }
+              }
+            ],
+            "routing": {
+              "domainStrategy": "AsIs",
+              "balancers": [
+                {
+                  "tag": "synthetic-auto-balancer",
+                  "selector": [
+                    "proxy"
+                  ],
+                  "fallbackTag": "proxy-fi-tcp",
+                  "strategy": {
+                    "type": "leastPing"
+                  }
+                }
+              ],
+              "rules": [
+                {
+                  "type": "field",
+                  "network": "tcp,udp",
+                  "balancerTag": "synthetic-auto-balancer"
+                }
+              ]
+            },
+            "observatory": {
+              "subjectSelector": [
+                "proxy"
+              ],
+              "probeURL": "https://probe.example.invalid/generate_204",
+              "probeInterval": "30s",
+              "enableConcurrency": true
+            }
+          }
+        },
+        "version": 2,
+        "transport_only_ids": [
+          "synthetic-native-auto"
+        ],
+        "routing": {
+          "vpn": {
+            "id": "empty",
+            "title": "Правила подписки",
+            "default_action": "tunnel",
+            "rules": []
+          }
+        }
+      },
+      "expected": {
+        "connections": [
+          {
+            "engine": "xray",
+            "id": "synthetic-fi-tcp",
+            "settings": {
+              "outbound": {
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "tcp.example.invalid",
+                      "port": 443,
+                      "users": [
+                        {
+                          "encryption": "none",
+                          "id": "00000000-0000-4000-8000-000000000001"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "network": "tcp",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "allowInsecure": false,
+                    "serverName": "tcp.example.invalid"
+                  }
+                },
+                "tag": "proxy-fi-tcp"
+              }
+            }
+          },
+          {
+            "engine": "xray",
+            "id": "synthetic-fi-grpc",
+            "settings": {
+              "outbound": {
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "grpc.example.invalid",
+                      "port": 443,
+                      "users": [
+                        {
+                          "encryption": "none",
+                          "id": "00000000-0000-4000-8000-000000000002"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "grpcSettings": {
+                    "serviceName": "synthetic-service"
+                  },
+                  "network": "grpc",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "allowInsecure": false,
+                    "serverName": "grpc.example.invalid"
+                  }
+                },
+                "tag": "proxy-fi-grpc"
+              }
+            }
+          },
+          {
+            "engine": "olcrtc",
+            "id": "synthetic-de-olcrtc",
+            "settings": {
+              "bootstrap_dns": "1.1.1.1:53",
+              "key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+              "provider": "jitsi",
+              "room": "https://room.example.invalid/synthetic-rtc",
+              "transport": "datachannel"
+            }
+          },
+          {
+            "engine": "openflux",
+            "id": "synthetic-de-openflux",
+            "settings": {
+              "codec": "batched",
+              "document_url": "synthetic-cups-room",
+              "encryption_secret": "synthetic-test-secret-do-not-use",
+              "transport": "cupsonline"
+            }
+          },
+          {
+            "engine": "xray",
+            "id": "synthetic-native-auto",
+            "routing_role": "transport_only",
+            "settings": {
+              "xray_config": {
+                "dns": {
+                  "servers": [
+                    "1.1.1.1",
+                    "8.8.8.8"
+                  ]
+                },
+                "observatory": {
+                  "enableConcurrency": true,
+                  "probeInterval": "30s",
+                  "probeURL": "https://probe.example.invalid/generate_204",
+                  "subjectSelector": [
+                    "proxy"
+                  ]
+                },
+                "outbounds": [
+                  {
+                    "protocol": "vless",
+                    "settings": {
+                      "vnext": [
+                        {
+                          "address": "tcp.example.invalid",
+                          "port": 443,
+                          "users": [
+                            {
+                              "encryption": "none",
+                              "id": "00000000-0000-4000-8000-000000000001"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "streamSettings": {
+                      "network": "tcp",
+                      "security": "tls",
+                      "tlsSettings": {
+                        "allowInsecure": false,
+                        "serverName": "tcp.example.invalid"
+                      }
+                    },
+                    "tag": "proxy-fi-tcp"
+                  },
+                  {
+                    "protocol": "vless",
+                    "settings": {
+                      "vnext": [
+                        {
+                          "address": "grpc.example.invalid",
+                          "port": 443,
+                          "users": [
+                            {
+                              "encryption": "none",
+                              "id": "00000000-0000-4000-8000-000000000002"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "streamSettings": {
+                      "grpcSettings": {
+                        "serviceName": "synthetic-service"
+                      },
+                      "network": "grpc",
+                      "security": "tls",
+                      "tlsSettings": {
+                        "allowInsecure": false,
+                        "serverName": "grpc.example.invalid"
+                      }
+                    },
+                    "tag": "proxy-fi-grpc"
+                  }
+                ],
+                "routing": {
+                  "balancers": [
+                    {
+                      "fallbackTag": "proxy-fi-tcp",
+                      "selector": [
+                        "proxy"
+                      ],
+                      "strategy": {
+                        "type": "leastPing"
+                      },
+                      "tag": "synthetic-auto-balancer"
+                    }
+                  ],
+                  "domainStrategy": "AsIs",
+                  "rules": [
+                    {
+                      "balancerTag": "synthetic-auto-balancer",
+                      "network": "tcp,udp",
+                      "type": "field"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ],
+        "format": "salfetka.subscription",
+        "id": "synthetic-subscription",
+        "locations": [
+          {
+            "connection_ids": [
+              "synthetic-native-auto"
+            ],
+            "icon": "🌐",
+            "id": "synthetic-vpn-auto",
+            "kind": "auto",
+            "mode": "vpn",
+            "selection": {
+              "type": "native"
+            },
+            "title": "Авто VPN · политика источника"
+          },
+          {
+            "connection_ids": [
+              "synthetic-fi-tcp",
+              "synthetic-fi-grpc"
+            ],
+            "country": "FI",
+            "icon": "🇫🇮",
+            "id": "synthetic-vpn-fi",
+            "kind": "location",
+            "mode": "vpn",
+            "selection": {
+              "type": "first_working"
+            },
+            "title": "Финляндия"
+          },
+          {
+            "connection_ids": [
+              "synthetic-de-olcrtc"
+            ],
+            "country": "DE",
+            "icon": "🇩🇪",
+            "id": "synthetic-bypass-de-rtc",
+            "kind": "location",
+            "mode": "bypass",
+            "selection": {
+              "type": "first_working"
+            },
+            "title": "Германия #1"
+          },
+          {
+            "connection_ids": [
+              "synthetic-de-openflux"
+            ],
+            "country": "DE",
+            "icon": "🇩🇪",
+            "id": "synthetic-bypass-de-flux",
+            "kind": "location",
+            "mode": "bypass",
+            "selection": {
+              "type": "first_working"
+            },
+            "title": "Германия #2"
+          }
+        ],
+        "network": {
+          "dns_servers": [
+            "1.1.1.1",
+            "8.8.8.8"
+          ],
+          "probe": {
+            "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "expected_status": 204,
+            "ipv4": "198.51.100.10",
+            "url": "https://probe.example.invalid/generate_204"
+          }
+        },
+        "revision": 1,
+        "routing": {
+          "vpn": {
+            "default_action": "tunnel",
+            "id": "empty",
+            "rules": [],
+            "title": "Правила подписки"
+          }
+        },
+        "subscription": {
+          "description": "Пример контракта. Все доступы и адреса вымышленные; подключение не проверяется.",
+          "expires_at": "2030-12-01T00:00:00Z",
+          "title": "САЛФЕТКА · синтетическая подписка",
+          "traffic": [
+            {
+              "download_bytes": 4194304,
+              "limit_bytes": 1073741824,
+              "scope": "subscription",
+              "upload_bytes": 1048576
+            }
+          ]
+        },
+        "valid_until": "2030-11-01T00:00:00Z",
+        "version": 2
+      }
+    }
+  ]
+}

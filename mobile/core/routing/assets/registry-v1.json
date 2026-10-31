@@ -1,0 +1,149 @@
+{
+  "format": "salfetka.service_registry",
+  "version": 1,
+  "revision": 1,
+  "services": [
+    {
+      "id": "vk",
+      "title": "ВКонтакте",
+      "category": "social",
+      "revision": 1,
+      "matchers": [
+        {
+          "type": "domain_suffix",
+          "value": "vk.com"
+        }
+      ],
+      "sources": [
+        "https://github.com/VKCOM/vk-ios-sdk"
+      ],
+      "coverage": "domains_only",
+      "ios_discovery": [
+        {
+          "scheme": "vk",
+          "source": "https://github.com/VKCOM/vk-ios-sdk"
+        }
+      ]
+    },
+    {
+      "id": "ok",
+      "title": "Одноклассники",
+      "category": "social",
+      "revision": 1,
+      "matchers": [
+        {
+          "type": "domain_suffix",
+          "value": "ok.ru"
+        }
+      ],
+      "sources": [
+        "https://ok.ru/ok"
+      ],
+      "coverage": "domains_only"
+    },
+    {
+      "id": "gosuslugi",
+      "title": "Госуслуги",
+      "category": "government",
+      "revision": 1,
+      "matchers": [
+        {
+          "type": "domain_suffix",
+          "value": "gosuslugi.ru"
+        }
+      ],
+      "sources": [
+        "https://www.gosuslugi.ru/",
+        "https://esia.gosuslugi.ru/"
+      ],
+      "coverage": "domains_only"
+    },
+    {
+      "id": "burgerking",
+      "title": "Бургер Кинг",
+      "category": "fastfood",
+      "revision": 1,
+      "matchers": [
+        {
+          "type": "domain_suffix",
+          "value": "burgerkingrus.ru"
+        }
+      ],
+      "sources": [
+        "https://burgerkingrus.ru/"
+      ],
+      "coverage": "domains_only"
+    },
+    {
+      "id": "vkusnoitochka",
+      "title": "Вкусно — и точка",
+      "category": "fastfood",
+      "revision": 1,
+      "matchers": [
+        {
+          "type": "domain_suffix",
+          "value": "vkusnoitochka.ru"
+        }
+      ],
+      "sources": [
+        "https://vkusnoitochka.ru/quality"
+      ],
+      "coverage": "domains_only"
+    }
+  ],
+  "presets": [
+    {
+      "id": "ru-standard",
+      "title": "Стандарт — RU напрямую",
+      "revision": 1,
+      "services": [],
+      "matchers": [
+        {
+          "type": "domain_suffix",
+          "value": "ru"
+        },
+        {
+          "type": "domain_suffix",
+          "value": "xn--p1ai"
+        },
+        {
+          "type": "geosite",
+          "value": "category-ru"
+        },
+        {
+          "type": "geoip",
+          "value": "ru"
+        }
+      ]
+    },
+    {
+      "id": "ru-social",
+      "title": "Российские соцсети",
+      "revision": 1,
+      "services": [
+        "vk",
+        "ok"
+      ],
+      "matchers": []
+    },
+    {
+      "id": "ru-government",
+      "title": "Государственные сервисы",
+      "revision": 1,
+      "services": [
+        "gosuslugi"
+      ],
+      "matchers": []
+    },
+    {
+      "id": "ru-fastfood",
+      "title": "Фастфуд",
+      "revision": 1,
+      "services": [
+        "burgerking",
+        "vkusnoitochka"
+      ],
+      "matchers": []
+    }
+  ]
+}

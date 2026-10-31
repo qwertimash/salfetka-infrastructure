@@ -29,7 +29,8 @@ def files():
         'panel/scripts/package-pilot.sh', 'panel/scripts/package-vpn-node.sh', 'panel/scripts/prepare-xray-server.py',
         'panel/scripts/collect-node-licenses.py', 'panel/scripts/ci-release.sh',
         'mobile/scripts/fetch-core-sources.py', 'mobile/scripts/subscription_catalog.py',
-        'mobile/core/routing/assets/geodata-tags-v1.json'])
+        'mobile/core/routing/assets/geodata-tags-v1.json', 'mobile/core/routing/assets/registry-v1.json',
+        'panel/tests/compatibility/fixtures.json'])
     baseline = json.loads((ROOT / 'panel/third_party/mobile-baseline.lock.json').read_text())
     for dep in baseline['dependencies']:
         if dep['id'] in ('xray-core', 'gvisor'):

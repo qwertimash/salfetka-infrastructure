@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def archive(source, target):
     source, target = Path(source), Path(target)
-    with target.open('xb') as stream, gzip.GzipFile(fileobj=stream, mode='wb', filename='', mtime=0) as zipped:
+    with target.open('xb') as stream, gzip.GzipFile(fileobj=stream, mode='wb', filename='', mtime=0, compresslevel=6) as zipped:
         with tarfile.open(fileobj=zipped, mode='w', format=tarfile.USTAR_FORMAT) as out:
             for path in sorted(source.rglob('*')):
                 require(not path.is_symlink(), 'package_symlink_refused')
@@ -90,7 +90,7 @@ def main():
             sources[component, arch] = Path(path)
     require(sources and set(sources) == {(component, arch) for arch in {a for _, a in sources} for component in ('panel', 'node')}, 'paired_panel_node_packages_required')
     with tempfile.TemporaryDirectory(prefix='salfetka-release-') as temporary:
-        installer = Path(temporary) / 'installer'; installer.mkdir()
+        installer = Path(temporary).resolve() / 'installer'; installer.mkdir()
         shutil.copytree(ROOT / 'scripts/installer', installer / 'installer', ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
         shutil.copy2(ROOT / 'scripts/salfetka.py', installer / 'salfetka.py')
         atomic(installer / 'release-public-key.pem', public_key, 0o644)

@@ -203,7 +203,8 @@ def health(home):
 def update(home, package, target):
     owner = owned(home)
     image = load_image(package)
-    require(image['version'] == target, 'image_version_mismatch')
+    from .system import platform_id
+    require(image['version'] == target and image['platform'] == platform_id(), 'image_version_or_platform_mismatch')
     compose(home, 'stop', 'edge', 'admin', 'delivery', 'worker')
     # Persisted journal in manager records target before changing the image.
     env = regular(Path(home) / 'compose.env').decode().splitlines()

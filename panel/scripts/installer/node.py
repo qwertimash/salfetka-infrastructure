@@ -61,6 +61,12 @@ def health():
 
 def update(package, version):
     owned(package)
+    import platform
+    machine = {'x86_64': 62, 'aarch64': 183, 'arm64': 183}.get(platform.machine())
+    for name in ('panel-node', 'panel-server-node'):
+        raw = regular(Path(package) / 'bin' / name, 256 * 1024 * 1024)
+        require(len(raw) >= 20 and raw[:6] == b'\x7fELF\x02\x01'
+                and int.from_bytes(raw[18:20], 'little') == machine, 'node_architecture_mismatch')
     with lock('/run/salfetka-install.lock'):
         # All inputs verified against the signed outer archive before this call.
         # Keep service identity, CA, signer, private keys and replay watermarks.
