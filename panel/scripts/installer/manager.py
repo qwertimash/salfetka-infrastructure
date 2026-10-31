@@ -250,9 +250,11 @@ class Manager:
              '--work-dir', home / 'work', '--logs-dir', home / 'logs'], timeout=600)
         cert, key = system.public_pair(home)
         config = state['config']; target = self.root / 'panel/public-tls'
-        if regular(target / 'fullchain.pem') == cert and regular(target / 'privkey.pem') == key: return
         panel.owned(self.root / 'panel')
-        system.install_public_pair(target, cert, key, [config['admin_domain'], config['subscription_domain']])
+        if regular(target / 'fullchain.pem') != cert or regular(target / 'privkey.pem') != key:
+            system.install_public_pair(target, cert, key, [config['admin_domain'], config['subscription_domain']])
+        # Retry activation even when files already match: a prior reload or
+        # permission update may have failed after the certificate was installed.
         for path in target.iterdir(): os.chown(path, 0, 65532); path.chmod(0o640)
         if state['phase'] == 'ready':
             panel.compose(self.root / 'panel', 'exec', '-T', 'edge', 'nginx', '-t')

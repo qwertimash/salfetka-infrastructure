@@ -73,6 +73,26 @@ class LifecycleTests(unittest.TestCase):
         with patch.object(system,'platform_id',return_value='linux/arm64'):
             return manager.Manager(self.root,key=b'public-key')
 
+    def test_renew_retries_activation_when_certificate_files_already_match(self):
+        m = self.manager()
+        m.commit({'phase': 'ready', 'components': {'panel': {'version': '0.6.0'}},
+                  'config': {'admin_domain': 'panel.example.com', 'subscription_domain': 'sub.example.com'}})
+        target = self.root / 'panel/public-tls'
+        target.mkdir(parents=True)
+        atomic(target / 'fullchain.pem', b'certificate')
+        atomic(target / 'privkey.pem', b'private-key-fixture')
+        with patch('installer.common.run'), patch.object(system, 'public_pair', return_value=(b'certificate', b'private-key-fixture')), \
+             patch.object(panel, 'owned'), patch.object(manager.os, 'chown'), \
+             patch.object(system, 'install_public_pair') as install, patch.object(panel, 'compose') as compose:
+            compose.side_effect = [None, Failure('reload_interrupted'), None, None]
+            with self.assertRaisesRegex(Failure, 'reload_interrupted'):
+                m.renew()
+            m.renew()
+            install.assert_not_called()
+            self.assertEqual([call.args[1:] for call in compose.call_args_list], [
+                ('exec', '-T', 'edge', 'nginx', '-t'), ('exec', '-T', 'edge', 'nginx', '-s', 'reload'),
+                ('exec', '-T', 'edge', 'nginx', '-t'), ('exec', '-T', 'edge', 'nginx', '-s', 'reload')])
+
     def test_failed_update_keeps_resumable_journal_and_never_reports_ready(self):
         m=self.manager()
         state={'phase':'ready','components':{'panel':{'version':'0.6.0'}},'config':{}}

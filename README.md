@@ -22,7 +22,16 @@ sudo python3 "$download_dir/install.py"
 
 Пока репозиторий PRIVATE, получите `install.py` из Release через авторизованный
 GitHub/`gh release download`, затем запустите с `--github-token-file`.
+Токен используется только для загрузки и не сохраняется установщиком. При проверке
+и установке обновлений приватного репозитория снова укажите тот же приватный файл:
 
+```sh
+sudo salfetka check --github-token-file /root/github-read-token
+sudo salfetka update --github-token-file /root/github-read-token
+```
+
+Токену достаточно чтения содержимого этого репозитория. Это отдельный доступ
+разработчика к GitHub; он не входит в код приглашения ноды.
 
 Мастер предлагает три варианта:
 
