@@ -112,7 +112,8 @@ func (f *Fleet) watch() {
 			return
 		case <-ticker.C:
 			f.mu.Lock()
-			now, ok := f.clock.Observe(time.Now(), time.Now())
+			sample := time.Now()
+			now, ok := f.clock.Observe(sample, sample)
 			if !ok {
 				f.poisoned = true
 			}
@@ -136,7 +137,8 @@ func (f *Fleet) Apply(s nodewire.SignedConnectionsPlan) ([]FleetStatus, error) {
 	if f.closed || f.poisoned {
 		return nil, fault("fleet_unavailable")
 	}
-	now, ok := f.clock.Observe(time.Now(), time.Now())
+	sample := time.Now()
+	now, ok := f.clock.Observe(sample, sample)
 	if !ok {
 		f.poisoned = true
 		f.stopEngines()
@@ -209,7 +211,8 @@ func (f *Fleet) Apply(s nodewire.SignedConnectionsPlan) ([]FleetStatus, error) {
 		}
 		f.statuses = append(f.statuses, status)
 	}
-	return append([]FleetStatus(nil), f.statuses...), nil
+	// The wire protocol distinguishes an empty report from a missing report.
+	return append([]FleetStatus{}, f.statuses...), nil
 }
 
 // WithConnection prevents replacement/expiry while the callback applies a

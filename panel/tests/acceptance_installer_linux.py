@@ -41,6 +41,17 @@ try:
     report={'panel_ready':True,'database_schema':panel.database_version(home), 'node_authenticated_heartbeat':True}
     state=decode(regular(node.HOME/'state/identity/state.json'))
     report['identity_node_id']=state['node_id']
+    # Heartbeat alone misses a broken empty-connection report. Require the
+    # authenticated agent's receipt to reach the database through the runtime role.
+    import uuid
+    node_id=str(uuid.UUID(state['node_id']))
+    for _ in range(30):
+        accepted=panel.compose(home,'exec','-T','postgres','psql','-U','panel_migrator','-d',panel.database_name(home),'-Atc',
+            "SELECT count(*) FROM managed_connection_observations WHERE node_id='"+node_id+"' AND body->'states'='[]'::jsonb AND received_at > clock_timestamp()-interval '15 seconds'").strip()
+        if accepted == b'1': break
+        time.sleep(2)
+    else: raise AssertionError('empty_connection_report_not_accepted')
+    report['empty_connection_report_accepted']=True
     save(root/'receipt.json',report)
     print(json.dumps(report))
 finally: api.logout()

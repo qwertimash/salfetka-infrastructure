@@ -4,6 +4,7 @@ import (
 	"crypto/ecdh"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"path/filepath"
 	"salfetka/panel/internal/connection"
@@ -17,6 +18,40 @@ import (
 type fleetFake struct {
 	stopped atomic.Bool
 	epoch   string
+}
+
+func TestFleetEmptyPlanProducesExplicitEmptyWireReport(t *testing.T) {
+	key, _ := nodecontrol.GenerateSigner()
+	signer, _ := nodecontrol.LoadSigner(key)
+	pub, _ := nodecontrol.LoadPublicKey(signer.PublicPEM())
+	id := "00000000-0000-4000-8000-000000000001"
+	f, err := OpenFleet(FleetConfig{StateDir: filepath.Join(t.TempDir(), "fleet"), NodeID: id, Signer: pub, Initialize: true, Open: func(nodewire.ConnectionDeployment, string, bool) (FleetController, error) {
+		t.Fatal("empty plan must not start a listener")
+		return nil, errors.New("unexpected listener")
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	for range 2 {
+		now := time.Now().UTC()
+		signed, err := signer.SignConnections(nodewire.ConnectionsPlan{SchemaVersion: 1, NodeID: id, Revision: 1, IssuedAt: now, ExpiresAt: now.Add(time.Minute), Connections: []nodewire.ConnectionDeployment{}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		states, err := f.Apply(signed)
+		if err != nil {
+			t.Fatal(err)
+		}
+		raw, err := json.Marshal(nodewire.ConnectionsReport{States: states})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var wire map[string]json.RawMessage
+		if err = json.Unmarshal(raw, &wire); err != nil || string(wire["states"]) != "[]" {
+			t.Fatalf("empty report rejected by wire contract: %s, %v", raw, err)
+		}
+	}
 }
 
 func (f *fleetFake) Epoch() string { return f.epoch }
