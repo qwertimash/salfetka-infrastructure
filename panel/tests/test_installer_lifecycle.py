@@ -80,6 +80,33 @@ class LifecycleTests(unittest.TestCase):
              self.assertRaisesRegex(Failure, 'node_authenticated_heartbeat_timeout'):
             node.health()
 
+    def test_panel_health_waits_for_edge_startup_then_verifies_both_tls_origins(self):
+        nginx_checks = 0
+        def compose(home, *args, **kwargs):
+            nonlocal nginx_checks
+            if args == ('exec', '-T', 'edge', 'nginx', '-t'):
+                nginx_checks += 1
+                if nginx_checks == 1: raise Failure('command_failed:docker')
+                return b''
+            return b'owned-container\n'
+        with patch.object(panel, 'wait_ready'), patch.object(panel, 'owned', return_value={'admin_origin': 'https://panel.example.com', 'subscription_origin': 'https://sub.example.com'}), \
+             patch.object(panel, 'compose', side_effect=compose), patch.object(panel, 'run', return_value=b'true\n'), \
+             patch.object(panel, 'API') as api, patch.object(panel.time, 'sleep') as sleep:
+            panel.health(self.root)
+        self.assertEqual(nginx_checks, 2)
+        sleep.assert_called_once_with(2)
+        self.assertEqual(api.call_count, 2)
+        self.assertEqual(api.return_value.call.call_count, 2)
+        self.assertEqual({c.args[0] for c in api.call_args_list}, {'https://panel.example.com', 'https://sub.example.com'})
+
+    def test_panel_health_never_accepts_permanent_edge_failure(self):
+        with patch.object(panel, 'wait_ready'), patch.object(panel, 'owned', return_value={'admin_origin': 'https://panel.example.com', 'subscription_origin': 'https://sub.example.com'}), \
+             patch.object(panel, 'API') as api, patch.object(panel, 'compose', side_effect=Failure('edge_unavailable')) as compose, \
+             patch.object(panel.time, 'sleep'), self.assertRaisesRegex(Failure, '^edge_unavailable$'):
+            panel.health(self.root)
+        self.assertEqual(compose.call_count, 30)
+        api.return_value.call.assert_not_called()
+
     def test_public_certificate_validation_happens_before_replacement(self):
         atomic(self.root/'fullchain.pem', b'old cert'); atomic(self.root/'privkey.pem', b'old key')
         with self.assertRaises(Exception):

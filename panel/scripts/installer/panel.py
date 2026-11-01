@@ -235,14 +235,26 @@ def database_version(home):
 
 def health(home):
     wait_ready(home)
-    for service in ('postgres', 'admin', 'delivery', 'worker', 'edge'):
-        ids = compose(home, 'ps', '-q', service).decode().split()
-        require(len(ids) == 1, 'panel_service_missing:' + service)
-        require(run(['docker', 'inspect', '--format={{.State.Running}}', ids[0]]).strip() == b'true', 'panel_service_not_running:' + service)
-    compose(home, 'exec', '-T', 'edge', 'nginx', '-t')
     owner = owned(home)
-    for origin in (owner['admin_origin'], owner['subscription_origin']):
-        API(origin, Path(home) / 'public-tls/fullchain.pem').call('/readyz')
+    clients = [API(origin, Path(home) / 'public-tls/fullchain.pem')
+               for origin in (owner['admin_origin'], owner['subscription_origin'])]
+    deadline = time.monotonic() + 60
+    for attempt in range(30):
+        try:
+            # Compose may report a running edge before Docker DNS has published
+            # its upstreams. Require the complete runtime, allowing bounded
+            # startup retries; a permanent config/TLS error still fails closed.
+            for service in ('postgres', 'admin', 'delivery', 'worker', 'edge'):
+                ids = compose(home, 'ps', '-q', service).decode().split()
+                require(len(ids) == 1, 'panel_service_missing:' + service)
+                require(run(['docker', 'inspect', '--format={{.State.Running}}', ids[0]]).strip() == b'true', 'panel_service_not_running:' + service)
+            compose(home, 'exec', '-T', 'edge', 'nginx', '-t')
+            for api in clients: api.call('/readyz')
+            return
+        except Failure:
+            if attempt == 29 or time.monotonic() >= deadline:
+                raise
+            time.sleep(2)
 
 
 def update(home, package, target):

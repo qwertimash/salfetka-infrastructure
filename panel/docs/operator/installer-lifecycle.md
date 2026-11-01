@@ -74,8 +74,8 @@ sudo salfetka
 sudo salfetka status
 sudo salfetka check
 sudo salfetka update
-sudo salfetka update --component panel --version 0.6.4
-sudo salfetka update --component node --version 0.6.4
+sudo salfetka update --component panel --version 0.6.5
+sudo salfetka update --component node --version 0.6.5
 sudo salfetka backup
 ```
 
@@ -83,7 +83,9 @@ sudo salfetka backup
 обеих архитектур. Код не берётся из текущего `main`; на сервере ничего не
 компилируется. Перед обновлением проверяются подпись, срок каталога, архитектура,
 протокол и schema. Downgrade отклоняется. Затем создаётся приватная резервная копия,
-обновляются выбранные компоненты и проверяются readiness/heartbeat. Ключи,
+обновляются выбранные компоненты и проверяются readiness/heartbeat. Проверка
+готовности ждёт запуска всех служб и публикации их имён во внутреннем DNS Docker;
+постоянная ошибка конфигурации/TLS по-прежнему останавливает операцию. Ключи,
 пользователи, ссылки подписок, настройки и регистрация нод сохраняются.
 
 Проверка образа поддерживает classic Docker и containerd: их локальные image ID
@@ -94,12 +96,12 @@ sudo salfetka backup
 затем повторите команду уже новым процессом:
 
 ```sh
-sudo salfetka update --component installer --version 0.6.4 --github-token-file /root/github-read-token
-sudo salfetka update --version 0.6.4 --github-token-file /root/github-read-token
+sudo salfetka update --component installer --version 0.6.5 --github-token-file /root/github-read-token
+sudo salfetka update --version 0.6.5 --github-token-file /root/github-read-token
 ```
 
 Это переход с ранних приёмочных сборок, которые ещё не учитывали различия image ID.
-В новой установке с `0.6.4` используется обычный `salfetka update`.
+В новой установке с `0.6.5` используется обычный `salfetka update`.
 
 `/opt/salfetka-manager/state.json` хранит установленные версии, `transaction.json`
 — этап незавершённой операции. Ошибка не отмечается как успех. Повторный `update`
