@@ -9,30 +9,46 @@
 Bootstrap `install.py` из официального репозитория проверяет Ed25519-подпись
 каталога релиза и SHA-256 готового пакета прежде, чем запустить мастер.
 Первоначальный источник доверия — официальный GitHub-репозиторий по HTTPS.
-Для запуска bootstrap нужны Python 3, OpenSSL и системные CA-сертификаты;
-для команды загрузки ниже также нужен curl.
-В приватной разработке передайте `--github-token-file /root/github-read-token`
-(файл 0600, только чтение этого репозитория). Не передавайте токен в URL/argv.
+Для запуска нужны Ubuntu24.04, sudo/root, Python3, curl, OpenSSL и системные CA.
 
-После открытия репозитория:
+Пока репозиторий PRIVATE, вставьте весь блок в терминал VPS: это одна команда.
+Она скрыто запросит GitHub-токен, автоматически скачает bootstrap и откроет мастер.
+Токену нужен доступ только к `qwertimash/salfetka-infrastructure`, Contents: Read-only.
+Токен не вставляется в саму команду, URL или аргументы процессов. Временный файл0600
+в каталоге0700 удаляется при обычном завершении, ошибке и обрабатываемом прерывании.
+
+```sh
+sudo bash -c 'set +x; set -euo pipefail; umask 077
+d=$(mktemp -d /tmp/salfetka-start.XXXXXXXX)
+cleanup() { rm -rf -- "$d"; }; trap cleanup EXIT; trap "exit 130" INT; trap "exit 143" TERM
+read -rsp "GitHub token (Contents: read): " salfetka_token </dev/tty; printf "\n"
+[[ "$salfetka_token" =~ ^[A-Za-z0-9_]+$ && ${#salfetka_token} -le 4096 ]] || exit 1
+printf "%s" "$salfetka_token" > "$d/token"
+printf "Authorization: Bearer %s\n" "$salfetka_token" | curl -q -fsS --proto =https --tlsv1.2 --location --max-redirs 0 --connect-timeout 15 --max-time 60 --max-filesize 262144 -H @- -H "Accept: application/vnd.github.raw+json" "https://api.github.com/repos/qwertimash/salfetka-infrastructure/contents/install.py?ref=main" -o "$d/install.py"
+unset salfetka_token
+python3 "$d/install.py" --github-token-file "$d/token"'
+```
+
+Запрос к GitHub Contents API не следует перенаправлениям, проверяет HTTPS и
+получает только bootstrap из официального репозитория. Затем bootstrap скачивает
+опубликованный Release и проверяет Ed25519/SHA-256 готового установщика. Исходники
+текущего main на сервере не компилируются. Первоначальное доверие — GitHub HTTPS
+и официальный репозиторий, как у прежней ручной загрузки `install.py`.
+
+Повторный запуск той же команды на установленном сервере открывает меню управления
+с доступом к приватным релизам. GitHub-токен — отдельный доступ к загрузке, он не
+входит в SN1-приглашение ноды. При SIGKILL/отключении питания trap не выполняется:
+в `/tmp/salfetka-start.*` может остаться root-only временный файл до очистки /tmp.
+
+После открытия репозитория доступен запуск без токена:
 
 ```sh
 download_dir=$(mktemp -d)
 curl -fL --proto '=https' --tlsv1.2 https://github.com/qwertimash/salfetka-infrastructure/releases/latest/download/install.py -o "$download_dir/install.py" && sudo python3 "$download_dir/install.py"
 ```
 
-Пока репозиторий PRIVATE, получите `install.py` из Release через авторизованный
-GitHub/`gh release download`, затем запустите с `--github-token-file`.
-Токен используется только для загрузки и не сохраняется установщиком. При проверке
-и установке обновлений приватного репозитория снова укажите тот же приватный файл:
-
-```sh
-sudo salfetka check --github-token-file /root/github-read-token
-sudo salfetka update --github-token-file /root/github-read-token
-```
-
-Токену достаточно чтения содержимого этого репозитория. Это отдельный доступ
-разработчика к GitHub; он не входит в код приглашения ноды.
+Прежний `--github-token-file /root/github-read-token` (файл0600) сохраняется для
+операторов, использующих собственное хранение токена и прямой `salfetka check/update`.
 
 Мастер предлагает три варианта:
 

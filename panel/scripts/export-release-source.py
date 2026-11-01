@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Export only standalone product sources. Never copy the bot or private state."""
 import argparse
+import importlib.util
 import json
 from pathlib import Path
 import shutil
@@ -25,7 +26,7 @@ def files():
         'panel/docs/operator/pilot.md', 'panel/docs/operator/b4-vpn-node.md', 'panel/docs/operator/node-installer.md',
         'panel/docs/operator/installer-lifecycle.md',
         'panel/scripts/install.py', 'panel/scripts/install-node.py', 'panel/scripts/node-wizard.py', 'panel/scripts/salfetka.py',
-        'panel/scripts/build-release.py', 'panel/scripts/export-release-source.py', 'panel/scripts/prepare-pilot.py',
+        'panel/scripts/build-release.py', 'panel/scripts/export-release-source.py', 'panel/scripts/private-install-command.sh', 'panel/scripts/prepare-pilot.py',
         'panel/scripts/package-pilot.sh', 'panel/scripts/package-vpn-node.sh', 'panel/scripts/prepare-xray-server.py',
         'panel/scripts/collect-node-licenses.py', 'panel/scripts/ci-release.sh',
         'mobile/scripts/fetch-core-sources.py', 'mobile/scripts/subscription_catalog.py',
@@ -47,6 +48,14 @@ def files():
     return sorted(chosen)
 
 
+def write_bootstrap(target):
+    # The same generator and pinned public key as immutable Release install.py.
+    # No second downloader implementation and no credential in this entry point.
+    spec = importlib.util.spec_from_file_location('salfetka_release_builder', ROOT / 'panel/scripts/build-release.py')
+    builder = importlib.util.module_from_spec(spec); spec.loader.exec_module(builder)
+    (Path(target) / 'install.py').write_bytes(builder.bootstrap((ROOT / 'panel/deploy/release/public-key.pem').read_bytes()))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__); parser.add_argument('output')
     target = Path(parser.parse_args().output).absolute()
@@ -61,6 +70,7 @@ def main():
     workflow = target / '.github/workflows/release.yml'; workflow.parent.mkdir(parents=True)
     shutil.copy2(ROOT / 'panel/deploy/release/workflow.yml', workflow)
     shutil.copy2(ROOT / 'panel/docs/operator/installer-lifecycle.md', target / 'README.md')
+    write_bootstrap(target)
     print('allowlisted_source_exported')
 
 if __name__ == '__main__': main()
