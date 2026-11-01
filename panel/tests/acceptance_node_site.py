@@ -50,7 +50,7 @@ save(qa/'pebble.json',{'pebble':{'listenAddress':'127.0.0.1:14000','managementLi
  'certificate':str(server_tls/'tls.crt'),'privateKey':str(server_tls/'tls.key'),'httpPort':80,'tlsPort':5001,
  'externalAccountBindingRequired':False,'keyAlgorithm':'ecdsa','profiles':{'default':{'description':'QA only','validityPeriod':7776000}}}})
 log=(qa/'pebble.log').open('w')
-process=subprocess.Popen([str(qa/'pebble'),'-config',str(qa/'pebble.json')],env=dict(os.environ,PEBBLE_VA_NOSLEEP='1',PEBBLE_AUTHZREUSE='0'),stdout=log,stderr=subprocess.STDOUT)
+process=subprocess.Popen([str(qa/'pebble'),'-config',str(qa/'pebble.json')],env=dict(os.environ,PEBBLE_VA_NOSLEEP='1',PEBBLE_AUTHZREUSE='0',PEBBLE_WFE_NONCEREJECT='0'),stdout=log,stderr=subprocess.STDOUT)
 force=False
 original_run=run
 
