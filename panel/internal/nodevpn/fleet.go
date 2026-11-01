@@ -88,7 +88,9 @@ func OpenFleet(cfg FleetConfig) (*Fleet, error) {
 		if d.Decode(&s) != nil || s.Version != 1 || s.NodeID != cfg.NodeID || s.SignerHash != hash(cfg.Signer) || s.Revision < 0 || s.Seen == nil || s.WallHighWater.IsZero() {
 			return fail(fault("fleet_state_invalid"))
 		}
-		if now.Before(s.WallHighWater) {
+		var trusted bool
+		now, trusted = leaseclock.AwaitRestart(s.WallHighWater)
+		if !trusted {
 			return fail(fault("fleet_clock_untrusted"))
 		}
 	}

@@ -25,13 +25,25 @@ def dependencies(panel=False):
             and release.stat().st_uid == 0 and release.stat().st_mode & 0o022 == 0, 'os_release_untrusted')
     data = dict(line.split('=', 1) for line in regular(release).decode().splitlines() if '=' in line)
     require(data.get('ID', '').strip('"') == 'ubuntu' and data.get('VERSION_ID', '').strip('"') == '24.04', 'supported_os_ubuntu_24_04_required')
+    existing_docker = panel and shutil.which('docker') is not None
     packages = ['ca-certificates', 'openssl', 'python3']
-    if panel: packages += ['docker.io', 'docker-compose-v2', 'certbot']
+    if panel:
+        packages += ['certbot']
+        if existing_docker:
+            # Reuse a working local engine/plugin; do not replace Docker CE,
+            # upgrade it, switch its context or restart somebody else's daemon.
+            require(run(['docker', 'info', '--format={{.OSType}}']).strip() == b'linux', 'local_linux_docker_required')
+            run(['docker', 'compose', 'version'])
+        else:
+            require(not any(os.path.lexists(Path(parent) / unit)
+                    for parent in ('/etc/systemd/system', '/usr/lib/systemd/system', '/lib/systemd/system')
+                    for unit in ('docker.service', 'docker.socket')), 'existing_docker_service_preserved')
+            packages += ['docker.io', 'docker-compose-v2']
     run(['apt-get', 'update', '-qq'], timeout=600)
-    run(['apt-get', 'install', '-y', '--no-install-recommends', *packages],
+    run(['apt-get', 'install', '-y', '--no-install-recommends', '--no-remove', '--no-upgrade', *packages],
         env=dict(os.environ, DEBIAN_FRONTEND='noninteractive'), timeout=900)
     if panel:
-        run(['systemctl', 'enable', '--now', 'docker'])
+        if not existing_docker: run(['systemctl', 'enable', '--now', 'docker'])
         run(['docker', 'compose', 'version'])
 
 

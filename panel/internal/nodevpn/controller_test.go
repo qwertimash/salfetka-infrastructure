@@ -208,24 +208,39 @@ func TestSmallClockCorrectionKeepsPolicyAndWatermark(t *testing.T) {
 	}
 }
 
-func TestRestartStillRejectsWallBelowPersistedFloor(t *testing.T) {
-	cfg, _, _ := fixture(t)
-	c, err := Open(cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// The in-process correction allowance must never become a restart allowance.
-	c.state.WallHighWater = time.Now().UTC().Add(500 * time.Millisecond)
-	if err = writeState(c.dir, c.state); err != nil {
-		t.Fatal(err)
-	}
-	c.Close()
-	reopened, err := Open(cfg)
-	if reopened != nil {
-		reopened.Close()
-	}
-	if err == nil || err.Error() != "vpn_clock_untrusted" {
-		t.Fatalf("restart bypassed persisted time floor: %v", err)
+func TestRestartWaitsWithoutBypassingPersistedFloor(t *testing.T) {
+	for _, gap := range []time.Duration{150 * time.Millisecond, 2 * time.Second} {
+		t.Run(gap.String(), func(t *testing.T) {
+			cfg, _, _ := fixture(t)
+			c, err := Open(cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			floor := time.Now().UTC().Add(gap)
+			c.state.WallHighWater = floor
+			if err = writeState(c.dir, c.state); err != nil {
+				t.Fatal(err)
+			}
+			c.Close()
+			factory := cfg.Factory
+			cfg.Factory = func() (Engine, error) {
+				if time.Now().Before(floor) {
+					t.Fatal("engine started before persisted time floor")
+				}
+				return factory()
+			}
+			reopened, err := Open(cfg)
+			if reopened != nil {
+				defer reopened.Close()
+			}
+			if gap > time.Second {
+				if err == nil || err.Error() != "vpn_clock_untrusted" {
+					t.Fatal("large rollback accepted", err)
+				}
+			} else if err != nil || !reopened.state.WallHighWater.Equal(floor) {
+				t.Fatal("bounded restart changed persisted floor", err)
+			}
+		})
 	}
 }
 

@@ -20,6 +20,52 @@ type fleetFake struct {
 	epoch   string
 }
 
+func TestFleetRestartHonorsPersistedClockFloor(t *testing.T) {
+	for _, gap := range []time.Duration{150 * time.Millisecond, 2 * time.Second} {
+		t.Run(gap.String(), func(t *testing.T) {
+			key, _ := nodecontrol.GenerateSigner()
+			signer, _ := nodecontrol.LoadSigner(key)
+			pub, _ := nodecontrol.LoadPublicKey(signer.PublicPEM())
+			cfg := FleetConfig{StateDir: filepath.Join(t.TempDir(), "fleet"), NodeID: "00000000-0000-4000-8000-000000000001", Signer: pub, Initialize: true,
+				Open: func(nodewire.ConnectionDeployment, string, bool) (FleetController, error) {
+					t.Fatal("restart must not start saved listeners")
+					return nil, errors.New("unexpected listener")
+				}}
+			f, err := OpenFleet(cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			watermark := time.Now().UTC().Add(gap)
+			f.mu.Lock()
+			f.state.WallHighWater = watermark
+			err = writeStateValue(f.dir, f.state)
+			f.mu.Unlock()
+			f.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+			cfg.Initialize = false
+			f, err = OpenFleet(cfg)
+			if gap > time.Second {
+				if f != nil {
+					f.Close()
+				}
+				if err == nil || err.Error() != "fleet_clock_untrusted" {
+					t.Fatal("large rollback accepted", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer f.Close()
+			if time.Now().Before(watermark) || !f.state.WallHighWater.Equal(watermark) {
+				t.Fatal("restart bypassed persisted clock floor")
+			}
+		})
+	}
+}
+
 func TestFleetEmptyPlanProducesExplicitEmptyWireReport(t *testing.T) {
 	key, _ := nodecontrol.GenerateSigner()
 	signer, _ := nodecontrol.LoadSigner(key)

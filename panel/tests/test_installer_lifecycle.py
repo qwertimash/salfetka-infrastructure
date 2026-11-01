@@ -36,6 +36,25 @@ class LifecycleTests(unittest.TestCase):
             system.private_tls(self.root, ['panel.example.com'])
         self.assertEqual(regular(self.root/'tls.crt'), b'original')
 
+    def test_node_health_waits_for_new_authenticated_response_after_restart(self):
+        state = self.root / 'state/identity/state.json'
+        state.parent.mkdir(parents=True)
+        old = {'sequence': 5, 'received_at': '2026-11-01T00:00:00Z', 'status': 'recorded'}
+        save(state, {'last_heartbeat': old})
+        def next_heartbeat(_):
+            save(state, {'last_heartbeat': dict(old, sequence=1, received_at='2026-11-01T00:00:01Z')})
+        with patch.object(node, 'HOME', self.root), patch.object(node, 'run'), \
+             patch.object(node.time, 'sleep', side_effect=next_heartbeat) as wait:
+            node.health()
+        wait.assert_called_once()
+
+    def test_node_health_rejects_stale_heartbeat_even_with_running_process(self):
+        (self.root / 'state/identity').mkdir(parents=True)
+        save(self.root / 'state/identity/state.json', {'last_heartbeat': {'status': 'recorded', 'sequence': 1}})
+        with patch.object(node, 'HOME', self.root), patch.object(node, 'run'), patch.object(node.time, 'sleep'), \
+             self.assertRaisesRegex(Failure, 'node_authenticated_heartbeat_timeout'):
+            node.health()
+
     def test_public_certificate_validation_happens_before_replacement(self):
         atomic(self.root/'fullchain.pem', b'old cert'); atomic(self.root/'privkey.pem', b'old key')
         with self.assertRaises(Exception):

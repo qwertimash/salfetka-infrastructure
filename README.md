@@ -46,7 +46,7 @@ sudo salfetka update --github-token-file /root/github-read-token
 и подписки используют HTTPS 9443; TCP/UDP 443 остаются VPN-ноду. В обоих вариантах
 TCP 18443 — отдельный проверяемый TLS-вход для нод. DNS A/AAAA должен вести на
 этот сервер, входящий TCP 80 нужен Let’s Encrypt. Установщик не переписывает пользовательские правила firewall/DNS
-и не удаляет чужие службы. Docker публикует перечисленные TCP-порты на IPv4/IPv6. Занятый порт или чужой ресурс останавливает установку.
+и не удаляет чужие службы. Docker публикует перечисленные TCP-порты на IPv4/IPv6. Установщик использует только локальный Unix socket Docker: внешний context не затрагивается. Рабочие Docker/Compose переиспользуются без замены пакетов или перезапуска Docker; несовместимая существующая установка сохраняется и требует исправления оператором. Занятый порт или чужой ресурс останавливает установку.
 
 Публичные сертификаты ACME продлеваются отдельным systemd timer дважды в сутки.
 Их продление не меняет доверие установленных нод: машинный сертификат и signer
@@ -65,8 +65,8 @@ sudo salfetka
 sudo salfetka status
 sudo salfetka check
 sudo salfetka update
-sudo salfetka update --component panel --version 0.6.2
-sudo salfetka update --component node --version 0.6.2
+sudo salfetka update --component panel --version 0.6.3
+sudo salfetka update --component node --version 0.6.3
 sudo salfetka backup
 ```
 
@@ -85,12 +85,12 @@ sudo salfetka backup
 затем повторите команду уже новым процессом:
 
 ```sh
-sudo salfetka update --component installer --version 0.6.2 --github-token-file /root/github-read-token
-sudo salfetka update --version 0.6.2 --github-token-file /root/github-read-token
+sudo salfetka update --component installer --version 0.6.3 --github-token-file /root/github-read-token
+sudo salfetka update --version 0.6.3 --github-token-file /root/github-read-token
 ```
 
 Это переход с ранних приёмочных сборок, которые ещё не учитывали различия image ID.
-В новой установке с `0.6.2` используется обычный `salfetka update`.
+В новой установке с `0.6.3` используется обычный `salfetka update`.
 
 `/opt/salfetka-manager/state.json` хранит установленные версии, `transaction.json`
 — этап незавершённой операции. Ошибка не отмечается как успех. Повторный `update`

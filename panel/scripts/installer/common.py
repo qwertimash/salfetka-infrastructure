@@ -105,6 +105,13 @@ def lock(path):
 
 def run(argv, *, cwd=None, env=None, timeout=180, input=None, output=None):
     """Never interpolate shell commands or surface subprocess stderr/secrets."""
+    if Path(argv[0]).name == 'docker':
+        # This installer owns services on this host only. Never inherit a remote
+        # Docker context, even when an operator uses one for unrelated work.
+        env = dict(os.environ if env is None else env)
+        for name in ('DOCKER_CONTEXT', 'DOCKER_TLS_VERIFY', 'DOCKER_CERT_PATH'):
+            env.pop(name, None)
+        env['DOCKER_HOST'] = 'unix:///var/run/docker.sock'
     try:
         result = subprocess.run([str(arg) for arg in argv], cwd=cwd, env=env,
                                 input=input, stdout=output or subprocess.PIPE,

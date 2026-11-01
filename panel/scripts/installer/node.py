@@ -44,17 +44,17 @@ def owned(package):
 def health():
     # A running process alone is not successful enrollment: require a fresh
     # authenticated heartbeat persisted by this actual agent.
-    start = time.time()
+    path = HOME / 'state/identity/state.json'
+    previous = decode(regular(path, 16 * 1024 * 1024)).get('last_heartbeat') if path.exists() else None
     for _ in range(60):
         run(['systemctl', 'is-active', '--quiet', SERVICE])
-        path = HOME / 'state/identity/state.json'
         if path.exists():
             state = decode(regular(path, 16 * 1024 * 1024))
             beat = state.get('last_heartbeat')
-            if beat and beat.get('status') == 'recorded':
-                from datetime import datetime
-                at = datetime.fromisoformat(beat['received_at'].replace('Z', '+00:00')).timestamp()
-                if at >= start - 5: return
+            # A timestamp near now can belong to the previous process. Wait for
+            # a newly persisted authenticated response, even after quick restart.
+            if beat and beat.get('status') == 'recorded' and beat != previous:
+                return
         time.sleep(2)
     raise Failure('node_authenticated_heartbeat_timeout')
 

@@ -120,7 +120,7 @@ func Open(cfg Config) (*Controller, error) {
 		if s.SchemaVersion != 1 || s.NodeID != cfg.NodeID || s.InstallationID != cfg.InstallationID || s.ConfigSHA256 != cfg.ConfigSHA256 || s.SignerSHA256 != hash(cfg.Signer) || s.WallHighWater.IsZero() || s.Generation < 0 || len(s.KnownIDs) > 256 {
 			return fail(fault("vpn_binding_changed"))
 		}
-		if c.now().UTC().Before(s.WallHighWater) {
+		if _, trusted := leaseclock.AwaitRestart(s.WallHighWater); !trusted {
 			return fail(fault("vpn_clock_untrusted"))
 		}
 		if s.Generation == 0 {
@@ -158,7 +158,8 @@ func Open(cfg Config) (*Controller, error) {
 			prior = id
 		}
 	}
-	c.leaseClock = leaseclock.New(c.now(), c.monotonic())
+	sample := time.Now()
+	c.leaseClock = leaseclock.New(sample, sample)
 	engine, err := cfg.Factory()
 	if err != nil {
 		return fail(fault("vpn_engine_start_failed"))
