@@ -8,7 +8,7 @@ import uuid
 from urllib.parse import urlsplit, urlunsplit
 
 from . import panel
-from .common import atomic, decode, regular, require, run, save, sha256
+from .common import Failure, atomic, decode, regular, require, run, save, sha256
 
 PANEL_FILES = {'owner.json', 'compose.json', 'compose.env', 'edge.conf', 'secrets', 'public-tls', 'owner-created', 'combined.json'}
 
@@ -93,11 +93,12 @@ def restore(root, directory, expected_state):
     panel.compose(home, 'exec', '-T', 'postgres', 'createdb', '-U', 'panel_migrator', target_db)
     # Feed through stdin: no world-readable copy of the dump in the container.
     with (directory / 'database.dump').open('rb') as source:
-        import subprocess
         argv = ['docker', 'compose', '--project-name', panel.PROJECT, '--env-file', 'compose.env', '-f', 'compose.json',
                 'exec', '-T', 'postgres', 'pg_restore', '--exit-on-error', '--no-owner', '--no-acl', '-U', 'panel_migrator', '-d', target_db]
-        result = subprocess.run(argv, cwd=home, stdin=source, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=600)
-        require(result.returncode == 0, 'restore_failed_live_database_unchanged')
+        try:
+            run(argv, cwd=home, stdin=source, timeout=600)
+        except Failure:
+            raise Failure('restore_failed_live_database_unchanged') from None
     # Provision a distinct least-privilege runtime role for this inactive DB.
     # The existing runtime role intentionally cannot gain access to a second DB.
     candidate = home / 'secrets/restore-database-url'

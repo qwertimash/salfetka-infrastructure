@@ -1,6 +1,7 @@
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import sys
 import tarfile
@@ -35,6 +36,30 @@ class LifecycleTests(unittest.TestCase):
         with self.assertRaisesRegex(Failure, 'already_exists'):
             system.private_tls(self.root, ['panel.example.com'])
         self.assertEqual(regular(self.root/'tls.crt'), b'original')
+
+    def test_restore_streams_dump_to_local_docker_and_preserves_live_db_on_failure(self):
+        point = self.root / 'backup'
+        point.mkdir()
+        (point / 'database.dump').write_bytes(b'isolated-dump-fixture')
+        state = {'components': {'panel': {'version': '0.6.3'}}, 'config': {'role': 'panel'}}
+        def execute(argv, **kwargs):
+            self.assertEqual(argv[0], 'docker')
+            self.assertIn('pg_restore', argv)
+            self.assertEqual(kwargs['env']['DOCKER_HOST'], 'unix:///var/run/docker.sock')
+            self.assertNotIn('DOCKER_CONTEXT', kwargs['env'])
+            self.assertNotIn('DOCKER_TLS_VERIFY', kwargs['env'])
+            self.assertEqual(kwargs['stdin'].read(), b'isolated-dump-fixture')
+            return Mock(returncode=1, stdout=b'', stderr=b'private-error-not-exposed')
+        with patch.dict(os.environ, {'DOCKER_CONTEXT': 'foreign', 'DOCKER_HOST': 'tcp://foreign.invalid:2376', 'DOCKER_TLS_VERIFY': '1'}), \
+             patch.object(backup, 'verify', return_value=state), patch.object(panel, 'owned', return_value={}), \
+             patch.object(backup, 'sha256', return_value='same-identity'), patch.object(panel, 'compose') as compose, \
+             patch('installer.common.subprocess.run', side_effect=execute) as process, \
+             self.assertRaisesRegex(Failure, '^restore_failed_live_database_unchanged$'):
+            backup.restore(self.root, point, state)
+        process.assert_called_once()
+        self.assertEqual(compose.call_count, 1)
+        self.assertIn('createdb', compose.call_args.args)
+        self.assertFalse((self.root / 'panel/secrets/database-runtime-url').exists())
 
     def test_node_health_waits_for_new_authenticated_response_after_restart(self):
         state = self.root / 'state/identity/state.json'

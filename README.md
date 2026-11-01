@@ -74,8 +74,8 @@ sudo salfetka
 sudo salfetka status
 sudo salfetka check
 sudo salfetka update
-sudo salfetka update --component panel --version 0.6.3
-sudo salfetka update --component node --version 0.6.3
+sudo salfetka update --component panel --version 0.6.4
+sudo salfetka update --component node --version 0.6.4
 sudo salfetka backup
 ```
 
@@ -94,12 +94,12 @@ sudo salfetka backup
 затем повторите команду уже новым процессом:
 
 ```sh
-sudo salfetka update --component installer --version 0.6.3 --github-token-file /root/github-read-token
-sudo salfetka update --version 0.6.3 --github-token-file /root/github-read-token
+sudo salfetka update --component installer --version 0.6.4 --github-token-file /root/github-read-token
+sudo salfetka update --version 0.6.4 --github-token-file /root/github-read-token
 ```
 
 Это переход с ранних приёмочных сборок, которые ещё не учитывали различия image ID.
-В новой установке с `0.6.3` используется обычный `salfetka update`.
+В новой установке с `0.6.4` используется обычный `salfetka update`.
 
 `/opt/salfetka-manager/state.json` хранит установленные версии, `transaction.json`
 — этап незавершённой операции. Ошибка не отмечается как успех. Повторный `update`

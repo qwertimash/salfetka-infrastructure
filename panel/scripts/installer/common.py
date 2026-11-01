@@ -103,7 +103,7 @@ def lock(path):
         os.close(fd)
 
 
-def run(argv, *, cwd=None, env=None, timeout=180, input=None, output=None):
+def run(argv, *, cwd=None, env=None, timeout=180, input=None, stdin=None, output=None):
     """Never interpolate shell commands or surface subprocess stderr/secrets."""
     if Path(argv[0]).name == 'docker':
         # This installer owns services on this host only. Never inherit a remote
@@ -114,7 +114,7 @@ def run(argv, *, cwd=None, env=None, timeout=180, input=None, output=None):
         env['DOCKER_HOST'] = 'unix:///var/run/docker.sock'
     try:
         result = subprocess.run([str(arg) for arg in argv], cwd=cwd, env=env,
-                                input=input, stdout=output or subprocess.PIPE,
+                                input=input, stdin=stdin, stdout=output or subprocess.PIPE,
                                 stderr=subprocess.PIPE, timeout=timeout)
     except (OSError, subprocess.TimeoutExpired):
         raise Failure('command_unavailable_or_timed_out:' + Path(argv[0]).name) from None
