@@ -69,6 +69,9 @@ def release_unit(package):
 
 def update(package, version):
     import hashlib, platform
+    from . import site
+    has_site = site.home().exists()
+    if has_site: site.owned()
     unit = Path('/etc/systemd/system') / SERVICE
     desired = release_unit(package)
     pending = HOME / 'update.json'
@@ -100,6 +103,9 @@ def update(package, version):
         atomic(unit, desired, 0o644)
         run(['systemctl', 'daemon-reload'])
         run(['systemctl', 'start', SERVICE])
+        if has_site:
+            run(['systemctl', 'restart', site.SERVICE])
+            site.health(site.owned()['domain'])
         health()
         save(HOME / 'release.json', {'version': version, 'binary_sha256': sha256(HOME / 'bin/panel-server-node'),
                                    'enroller_sha256': sha256(HOME / 'bin/panel-node')})

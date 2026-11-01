@@ -34,7 +34,7 @@ def files():
         'services/traffic_observation.py', 'services/traffic_observation_sources.py',
         'services/antifraud.py', 'services/antifraud_api.py', 'services/antifraud_budget.py',
         'tests/__init__.py', 'tests/antifraud_tls_fixture.py', 'tests/test_traffic_observation.py',
-        'panel/tests/acceptance_installer_linux.py'])
+        'panel/tests/acceptance_installer_linux.py', 'panel/tests/acceptance_node_site.py', 'panel/tests/acceptance_site_roles.py'])
     golden = json.loads((ROOT / 'panel/tests/compatibility/fixtures.json').read_text())
     for relative in golden['source_hashes']:
         if not relative.startswith(('mobile/scripts/', 'mobile/tests/', 'mobile/contracts/', 'panel/tests/compatibility/')):

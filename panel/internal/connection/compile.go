@@ -6,6 +6,9 @@ func lines(s string) []string { return strings.Split(strings.TrimSpace(s), "\n")
 
 // ServerStream is called only after validating the complete private configuration.
 func (c Configuration) ServerStream() (map[string]any, error) {
+	if c.Public.CertificateSource == "node" && c.Public.Template != Reality {
+		return nil, ErrSecrets
+	}
 	if e := c.Validate(); e != nil {
 		return nil, e
 	}

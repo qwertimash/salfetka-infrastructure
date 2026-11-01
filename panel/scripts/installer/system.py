@@ -26,9 +26,8 @@ def dependencies(panel=False):
     data = dict(line.split('=', 1) for line in regular(release).decode().splitlines() if '=' in line)
     require(data.get('ID', '').strip('"') == 'ubuntu' and data.get('VERSION_ID', '').strip('"') == '24.04', 'supported_os_ubuntu_24_04_required')
     existing_docker = panel and shutil.which('docker') is not None
-    packages = ['ca-certificates', 'openssl', 'python3']
+    packages = ['ca-certificates', 'openssl', 'python3', 'certbot', 'iproute2']
     if panel:
-        packages += ['certbot']
         if existing_docker:
             # Reuse a working local engine/plugin; do not replace Docker CE,
             # upgrade it, switch its context or restart somebody else's daemon.

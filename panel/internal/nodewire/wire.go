@@ -25,14 +25,32 @@ type EnrollmentResponse struct {
 	ExpiresAt      time.Time `json:"expires_at"`
 }
 type HeartbeatRequest struct {
-	SchemaVersion int      `json:"schema_version"`
-	NodeID        string   `json:"node_id"`
-	BootID        string   `json:"boot_id"`
-	Sequence      int64    `json:"sequence"`
-	Version       string   `json:"version"`
-	Platform      string   `json:"platform"`
-	Arch          string   `json:"arch"`
-	Capabilities  []string `json:"capabilities"`
+	Site          *SiteStatus `json:"site,omitempty"`
+	SchemaVersion int         `json:"schema_version"`
+	NodeID        string      `json:"node_id"`
+	BootID        string      `json:"boot_id"`
+	Sequence      int64       `json:"sequence"`
+	Version       string      `json:"version"`
+	Platform      string      `json:"platform"`
+	Arch          string      `json:"arch"`
+	Capabilities  []string    `json:"capabilities"`
+}
+
+// Only public certificate material crosses the control channel.
+type SiteStatus struct {
+	ExpiresAt      time.Time `json:"expires_at"`
+	Domain         string    `json:"domain"`
+	CertificatePEM string    `json:"certificate_pem,omitempty"`
+	State          string    `json:"state"`
+}
+
+const SiteInfoPath = "/api/v1/node/site-info"
+
+type SiteInfo struct {
+	SchemaVersion int    `json:"schema_version"`
+	NodeID        string `json:"node_id"`
+	Domain        string `json:"domain"`
+	Address       string `json:"address"`
 }
 type HeartbeatResponse struct {
 	SchemaVersion int       `json:"schema_version"`

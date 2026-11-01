@@ -40,3 +40,11 @@ sudo cp -R panel/scripts/installer /tmp/salfetka-qa-code/
 sudo sh -c 'printf "%s\n" disposable-lima-salfetka-qa > /run/salfetka-isolated-installer-qa'
 printf '%s\n' '127.0.0.1 panel.qa.test sub.qa.test node.qa.test' | sudo tee -a /etc/hosts >/dev/null
 sudo python3 panel/tests/acceptance_installer_linux.py "$PWD/dist/panel" "$PWD/dist/node"
+sudo apt-get update -qq
+sudo apt-get install -y --no-install-recommends --no-remove --no-upgrade certbot
+sudo python3 panel/tests/acceptance_node_site.py
+mkdir dist/installer
+cp -R panel/scripts/installer dist/installer/
+cp panel/scripts/salfetka.py dist/installer/
+cp panel/deploy/release/public-key.pem dist/installer/release-public-key.pem
+sudo python3 panel/tests/acceptance_site_roles.py "$PWD/dist"

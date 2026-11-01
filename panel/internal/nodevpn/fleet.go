@@ -27,6 +27,7 @@ type FleetConfig struct {
 	Signer           ed25519.PublicKey
 	Initialize       bool
 	Open             func(nodewire.ConnectionDeployment, string, bool) (FleetController, error)
+	MaterialVersion  func(nodewire.ConnectionDeployment) (string, error)
 }
 type FleetStatus = nodewire.ConnectionState
 type fleetVersion struct {
@@ -45,6 +46,7 @@ type fleetState struct {
 type fleetEntry struct {
 	Deployment nodewire.ConnectionDeployment
 	Controller FleetController
+	Material   string
 }
 type Fleet struct {
 	mu               sync.Mutex
@@ -182,12 +184,19 @@ func (f *Fleet) Apply(s nodewire.SignedConnectionsPlan) ([]FleetStatus, error) {
 	f.state = next
 	f.deadline = p.ExpiresAt
 	wanted := map[string]nodewire.ConnectionDeployment{}
+	materials := map[string]string{}
+	materialErrors := map[string]bool{}
 	for _, c := range p.Connections {
 		wanted[c.ID] = c
+		if c.Enabled && f.cfg.MaterialVersion != nil {
+			v, err := f.cfg.MaterialVersion(c)
+			materials[c.ID] = v
+			materialErrors[c.ID] = err != nil
+		}
 	}
 	for id, old := range f.entries {
 		c, exists := wanted[id]
-		if !exists || !c.Enabled || c.Revision != old.Deployment.Revision || c.ConfigurationSHA256 != old.Deployment.ConfigurationSHA256 {
+		if !exists || !c.Enabled || c.Revision != old.Deployment.Revision || c.ConfigurationSHA256 != old.Deployment.ConfigurationSHA256 || materials[id] != old.Material || materialErrors[id] {
 			old.Controller.Close()
 			delete(f.entries, id)
 		}
@@ -196,6 +205,12 @@ func (f *Fleet) Apply(s nodewire.SignedConnectionsPlan) ([]FleetStatus, error) {
 	for _, c := range p.Connections {
 		status := FleetStatus{ID: c.ID, Revision: c.Revision, State: "disabled"}
 		if c.Enabled {
+			if materialErrors[c.ID] {
+				status.State = "failed"
+				status.ErrorCode = "node_certificate_unavailable"
+				f.statuses = append(f.statuses, status)
+				continue
+			}
 			if _, exists := f.entries[c.ID]; !exists {
 				dir := filepath.Join(f.cfg.StateDir, fmt.Sprintf("connection-%s-%d", c.ID, c.Revision))
 				_, err := os.Lstat(filepath.Join(dir, "state.json"))
@@ -207,7 +222,7 @@ func (f *Fleet) Apply(s nodewire.SignedConnectionsPlan) ([]FleetStatus, error) {
 					f.statuses = append(f.statuses, status)
 					continue
 				}
-				f.entries[c.ID] = fleetEntry{c, controller}
+				f.entries[c.ID] = fleetEntry{Deployment: c, Controller: controller, Material: materials[c.ID]}
 			}
 			status.State = "listening"
 		}

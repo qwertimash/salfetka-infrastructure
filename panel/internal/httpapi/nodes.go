@@ -102,7 +102,7 @@ func (a *api) serveNodes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var body nodewire.HeartbeatRequest
-		if !decode(w, r, &body) {
+		if !decodeNodeDocument(w, r, &body) {
 			return
 		}
 		result, replay, err := a.nodes.Heartbeat(r.Context(), r.TLS.PeerCertificates[0], body)

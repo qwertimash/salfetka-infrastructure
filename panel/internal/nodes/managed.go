@@ -200,6 +200,12 @@ func (s *Store) CreateManagedConnectionsTx(ctx context.Context, tx pgx.Tx, m Mut
 			return ErrVPNCapacity
 		}
 		configs := make([]connection.Configuration, len(requests))
+		for _, r := range requests {
+			if r.Configuration.Public.CertificateSource == "node" {
+				occupied = append(occupied, connection.Listener{IP: "::", Port: 80, Network: "tcp"}, connection.Listener{IP: "::", Port: 8445, Network: "tcp"})
+				break
+			}
+		}
 		wanted := make([]connection.Spec, len(requests))
 		for i, r := range requests {
 			configs[i] = r.Configuration
@@ -216,6 +222,9 @@ func (s *Store) CreateManagedConnectionsTx(ctx context.Context, tx pgx.Tx, m Mut
 		for i, r := range requests {
 			c := configs[i]
 			c.Public = allocated[i]
+			if e = s.nodeCertificateReady(ctx, tx, m.TargetID, c, r.TrustedCAPEM, r.Enabled); e != nil {
+				return e
+			}
 			if c.Validate() != nil {
 				return ErrInvalid
 			}

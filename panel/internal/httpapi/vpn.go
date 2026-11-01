@@ -36,7 +36,7 @@ func (a *api) serveNodeVPN(w http.ResponseWriter, r *http.Request) bool {
 		}
 		if r.URL.Path == nodewire.VPNReceiptsPath {
 			var body nodewire.VPNReport
-			if !decodeVPNReport(w, r, &body) {
+			if !decodeNodeDocument(w, r, &body) {
 				return true
 			}
 			result, replay, err := a.nodes.RecordVPN(r.Context(), r.TLS.PeerCertificates[0], body)
@@ -152,7 +152,7 @@ func (a *api) serveNodeVPN(w http.ResponseWriter, r *http.Request) bool {
 
 // Larger bounded envelope for 128 counter pairs; reject nested duplicate/unknown
 // fields so an ACK has one interpretation at both ends.
-func decodeVPNReport(w http.ResponseWriter, r *http.Request, out *nodewire.VPNReport) bool {
+func decodeNodeDocument(w http.ResponseWriter, r *http.Request, out any) bool {
 	media, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil || media != "application/json" {
 		writeError(w, 415, "invalid_request")

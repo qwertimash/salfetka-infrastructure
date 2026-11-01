@@ -430,6 +430,9 @@ func (s *Store) authorizeLeaf(cert *x509.Certificate, nodeID string) error {
 var agentVersionPattern = regexp.MustCompile(`^[A-Za-z0-9_.+-]{1,64}$`)
 
 func validateHeartbeat(r nodewire.HeartbeatRequest) bool {
+	if !validSite(r.Site, time.Time{}) {
+		return false
+	}
 	if r.SchemaVersion != 1 || !database.ValidID(r.NodeID) || !database.ValidID(r.BootID) || r.Sequence < 1 || r.Sequence > 9007199254740991 || !agentVersionPattern.MatchString(r.Version) || len(r.Capabilities) > 4 || r.Capabilities == nil {
 		return false
 	}
@@ -471,6 +474,9 @@ func (s *Store) Heartbeat(ctx context.Context, cert *x509.Certificate, r nodewir
 	}
 	defer database.Rollback(tx)
 	if err = s.lockAuthorizedNode(ctx, tx, cert, r.NodeID); err != nil {
+		return out, false, err
+	}
+	if err = s.validateSiteOwner(ctx, tx, r.NodeID, r.Site); err != nil {
 		return out, false, err
 	}
 	var currentBoot *string

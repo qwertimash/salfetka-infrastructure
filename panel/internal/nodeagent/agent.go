@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"runtime"
+	"salfetka/panel/internal/nodesite"
 	"salfetka/panel/internal/nodewire"
 	"strings"
 	"sync"
@@ -21,6 +22,7 @@ import (
 )
 
 type Config struct {
+	SiteDir                                        string
 	ManagedConnections                             bool
 	StateDir, PanelURL, CAFile, TokenFile, Version string
 	SignerPublicFile                               string
@@ -316,6 +318,16 @@ func (a *Agent) Heartbeat(ctx context.Context) error {
 	}
 	if a.pending == nil {
 		a.pending = &nodewire.HeartbeatRequest{SchemaVersion: nodewire.SchemaVersion, NodeID: a.state.NodeID, BootID: a.bootID, Sequence: a.sequence, Version: a.cfg.Version, Platform: runtime.GOOS, Arch: runtime.GOARCH, Capabilities: []string{"enrollment", "heartbeat", "certificate_renewal"}}
+		if a.cfg.SiteDir != "" {
+			if cfg, err := nodesite.LoadConfig(a.cfg.SiteDir); err == nil {
+				a.pending.Site = &nodewire.SiteStatus{Domain: cfg.Domain, State: "unavailable"}
+				if cert, err := nodesite.Load(a.cfg.SiteDir, cfg.Domain, a.now()); err == nil && nodesite.Probe(cfg.Domain, cert) == nil {
+					a.pending.Site.State = "ready"
+					a.pending.Site.CertificatePEM = cert.PEM
+					a.pending.Site.ExpiresAt = cert.ExpiresAt
+				}
+			}
+		}
 		if a.cfg.ManagedConnections {
 			a.pending.Capabilities = append(a.pending.Capabilities, "managed_connections_v1")
 		}

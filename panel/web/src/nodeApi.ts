@@ -4,7 +4,7 @@ import type { Page, Role } from './api'
 export type Node = {
   id: string; name: string; state: 'pending' | 'active' | 'revoked'; revision: number
   serial: string | null; certificate_expires_at: string | null; last_seen_at: string | null
-  inventory: null | { schema_version: number; node_id: string; boot_id: string; sequence: number; version: string; platform: string; arch: string; capabilities: string[] }
+  inventory: null | { site?: {domain:string;state:'ready'|'unavailable';expires_at:string;certificate_pem?:string}; schema_version: number; node_id: string; boot_id: string; sequence: number; version: string; platform: string; arch: string; capabilities: string[] }
   contact_state: 'unknown' | 'stale' | 'fresh'; engine_state: 'not_configured'; created_at: string; updated_at: string
 }
 export type Config = { heartbeat_interval_seconds: number }
@@ -25,6 +25,7 @@ export function node(value: Node, expected?: string): Node {
   check((value.serial === null || typeof value.serial === 'string') && (value.certificate_expires_at === null || date(value.certificate_expires_at)) && (value.last_seen_at === null || date(value.last_seen_at)))
   const i = value.inventory
   check(i === null || i && i.schema_version === 1 && i.node_id === value.id && id(i.boot_id) && revision(i.sequence) && typeof i.version === 'string' && typeof i.platform === 'string' && typeof i.arch === 'string' && Array.isArray(i.capabilities) && i.capabilities.every(c => typeof c === 'string'))
+  if(i?.site)check(/^[a-z0-9.-]+$/.test(i.site.domain)&&i.site.domain.includes('.')&&['ready','unavailable'].includes(i.site.state)&&date(i.site.expires_at))
   return value
 }
 export function nodesPage(value: Page<Node>) {

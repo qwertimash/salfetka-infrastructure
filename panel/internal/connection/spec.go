@@ -58,17 +58,18 @@ func Lookup(id string) (Template, bool) {
 // Spec contains only public connection parameters. PrivateMaterial travels only
 // inside the encrypted database record and the authenticated node channel.
 type Spec struct {
-	Template         string `json:"template"`
-	Version          int    `json:"version"`
-	Host             string `json:"host"`
-	ListenIP         string `json:"listen_ip"`
-	Port             int    `json:"port"`
-	ServerName       string `json:"server_name"`
-	ServiceName      string `json:"service_name,omitempty"`
-	Path             string `json:"path,omitempty"`
-	RealityTarget    string `json:"reality_target,omitempty"`
-	RealityPublicKey string `json:"reality_public_key,omitempty"`
-	RealityShortID   string `json:"reality_short_id,omitempty"`
+	CertificateSource string `json:"certificate_source,omitempty"`
+	Template          string `json:"template"`
+	Version           int    `json:"version"`
+	Host              string `json:"host"`
+	ListenIP          string `json:"listen_ip"`
+	Port              int    `json:"port"`
+	ServerName        string `json:"server_name"`
+	ServiceName       string `json:"service_name,omitempty"`
+	Path              string `json:"path,omitempty"`
+	RealityTarget     string `json:"reality_target,omitempty"`
+	RealityPublicKey  string `json:"reality_public_key,omitempty"`
+	RealityShortID    string `json:"reality_short_id,omitempty"`
 }
 type PrivateMaterial struct {
 	CertificatePEM    string `json:"certificate_pem,omitempty"`
@@ -100,6 +101,12 @@ func Host(s string) bool {
 	return true
 }
 func (s Spec) Validate() error {
+	if s.CertificateSource != "" && s.CertificateSource != "node" {
+		return ErrInvalid
+	}
+	if s.CertificateSource == "node" && s.Template == Reality && s.RealityTarget != "127.0.0.1:8445" {
+		return ErrInvalid
+	}
 	if _, ok := Lookup(s.Template); !ok || s.Version != Version {
 		return ErrInvalid
 	}
@@ -148,6 +155,12 @@ func (c Configuration) Validate() error {
 			return ErrSecrets
 		}
 	} else {
+		if c.Public.CertificateSource == "node" {
+			if s.CertificatePEM != "" || s.KeyPEM != "" || s.RealityPrivateKey != "" {
+				return ErrSecrets
+			}
+			return nil
+		}
 		if s.RealityPrivateKey != "" || len(s.CertificatePEM) > 32768 || len(s.KeyPEM) > 32768 {
 			return ErrSecrets
 		}
@@ -265,6 +278,11 @@ func (c Configuration) ReadyAt(now time.Time) error {
 	}
 	if c.Public.Template == Reality {
 		return nil
+	}
+	// A reference is valid on the wire, but cannot run until the node resolves
+	// it to a verified local pair. Never send an empty certificate to an engine.
+	if c.Public.CertificateSource == "node" {
+		return ErrSecrets
 	}
 	pair, e := tls.X509KeyPair([]byte(c.Private.CertificatePEM), []byte(c.Private.KeyPEM))
 	if e != nil {

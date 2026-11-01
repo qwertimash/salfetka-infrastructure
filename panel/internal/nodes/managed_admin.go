@@ -162,6 +162,9 @@ func (s *Store) UpdateManagedConnectionTx(ctx context.Context, tx pgx.Tx, m Muta
 			request.Configuration.Private = old.Private
 		}
 		c := request.Configuration
+		if e = s.nodeCertificateReady(ctx, tx, owner, c, request.TrustedCAPEM, request.Enabled); e != nil {
+			return e
+		}
 		if c.Public.Template != old.Public.Template || c.Validate() != nil || !validName(request.Name) {
 			return ErrInvalid
 		}

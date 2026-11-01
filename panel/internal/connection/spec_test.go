@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func sample(id string) Spec {
@@ -98,5 +99,27 @@ func TestRealityKeyBindingAndClientSecretSeparation(t *testing.T) {
 	c.Private.RealityPrivateKey = strings.Repeat("a", 43)
 	if c.Validate() == nil {
 		t.Fatal("unbound private key")
+	}
+}
+
+func TestNodeLocalCertificateReferenceIsNotExecutableOrPrivate(t *testing.T) {
+	c := Configuration{Public: Spec{CertificateSource: "node", Template: GRPC, Version: 1, Host: "192.0.2.1", ListenIP: "0.0.0.0", Port: 8443, ServerName: "node.example.com", ServiceName: "vpn"}}
+	if c.Validate() != nil {
+		t.Fatal("valid reference rejected")
+	}
+	if c.ReadyAt(time.Now()) == nil {
+		t.Fatal("unresolved reference executable")
+	}
+	if _, err := c.ServerStream(); err == nil {
+		t.Fatal("unresolved certificate compiled")
+	}
+	c.Private.KeyPEM = "private"
+	if c.Validate() == nil {
+		t.Fatal("private key accepted with node reference")
+	}
+	c.Private = PrivateMaterial{}
+	c.Public.CertificateSource = "/etc/passwd"
+	if c.Validate() == nil {
+		t.Fatal("arbitrary certificate path accepted")
 	}
 }

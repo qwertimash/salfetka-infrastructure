@@ -12,7 +12,7 @@ import sys
 import tempfile
 import warnings
 
-from . import backup, node, panel, system
+from . import backup, node, panel, system, site
 from .common import Failure, atomic, decode, lock, regular, require, save, sha256, version
 from .releases import Catalog, Github, compatible, unpack, verify_manifest
 
@@ -51,11 +51,15 @@ def initial_config(role):
             value['node_name'] = input('Название этого сервера в панели: ').strip()
             require(2 <= len(value['node_name']) <= 80 and all(ord(c) >= 32 for c in value['node_name']), 'invalid_node_name')
             value['node_domain'] = system.domain(input('Отдельный домен ноды: ').strip().lower())
+            require(value['node_domain'] not in (value['admin_domain'], value['subscription_domain']), 'separate_node_domain_required')
             system.dns(value['node_domain'], value['address'])
         print('Панель: https://' + value['admin_domain'] + (':9443' if role == 'both' else ''))
         print('Подписки: https://' + value['subscription_domain'] + (':9443' if role == 'both' else ''))
         print('Защищённая связь нод: TCP 18443. Выпуск/продление HTTPS: входящий TCP 80.')
         if role == 'both': print('TCP/UDP 443 оставлены ноде; панель и подписки используют HTTPS 9443.')
+    if role == 'node':
+        value['email'] = input('Email для сертификата ноды Let’s Encrypt: ').strip()
+        require(re.fullmatch(r'[A-Za-z0-9._+\-]+@[A-Za-z0-9.\-]+', value['email']), 'invalid_acme_email')
     return value
 
 
@@ -135,7 +139,7 @@ class Manager:
         run(['systemctl', 'daemon-reload'])
         run(['systemctl', 'enable', '--now', 'salfetka-certificate.timer'])
 
-    def install(self, role, tag, config=None, password=None, invitation=None, public_pair=None):
+    def install(self, role, tag, config=None, password=None, invitation=None, public_pair=None, node_pair=None):
         # Injected configuration/TLS is used by isolated Linux acceptance; the
         # public CLI always goes through DNS, terminal confirmation and ACME.
         if (self.root / 'state.json').exists():
@@ -191,10 +195,16 @@ class Manager:
                     require(confirm('Адрес панели верен? Зарегистрировать ноду?'), 'installation_cancelled')
                     helper.decode_code(code); helper.verify_panel(invitation)
                 node.install(directory / 'node', invitation, manifest['version'])
+            elif 'node' in state['components']:
+                node.owned(directory / 'node'); node.health()
             else:
                 # A completed enrollment can be resumed without consuming a new code.
                 node.resume(directory / 'node', manifest['version'])
             state['components']['node'] = {'version': manifest['version']}; self.commit(state)
+            self.journal('install', 'node_site', target=manifest['version'])
+            info = site.setup(self.root, config, node_pair)
+            config['node_site'] = True; config['node_domain'] = info['domain']
+            self.commit(state)
         state['phase'] = 'ready'; self.commit(state); self.journal('install', 'complete')
         print('Установка завершена. Управление: sudo salfetka')
         if 'panel' in state['components']: print('Панель: ' + panel.owned(home)['admin_origin'])
@@ -242,12 +252,22 @@ class Manager:
 
     def renew(self):
         state = self.state()
-        if 'panel' not in state['components']: return
         require(state['phase'] in ('ready', 'stopped', 'restored_stopped'), 'installation_operation_in_progress')
+        site_error = None
+        if state['config'].get('node_site'):
+            try: site.renew(self.root)
+            except Exception: site_error = Failure('node_certificate_renewal_failed_last_valid_pair_preserved')
+        if 'panel' not in state['components']:
+            if site_error: raise site_error
+            return
         from .common import run
         home = self.root / 'acme'
-        run(['certbot', 'renew', '--non-interactive', '--config-dir', home / 'config',
-             '--work-dir', home / 'work', '--logs-dir', home / 'logs'], timeout=600)
+        command = ['certbot', 'renew', '--non-interactive', '--no-random-sleep-on-renew', '--config-dir', home / 'config',
+             '--work-dir', home / 'work', '--logs-dir', home / 'logs']
+        if state['config'].get('node_site'):
+            site.owned()
+            command += ['--webroot', '--webroot-path', site.home() / 'webroot']
+        run(command, timeout=600)
         cert, key = system.public_pair(home)
         config = state['config']; target = self.root / 'panel/public-tls'
         panel.owned(self.root / 'panel')
@@ -259,6 +279,20 @@ class Manager:
         if state['phase'] == 'ready':
             panel.compose(self.root / 'panel', 'exec', '-T', 'edge', 'nginx', '-t')
             panel.compose(self.root / 'panel', 'exec', '-T', 'edge', 'nginx', '-s', 'reload')
+        if site_error: raise site_error
+
+    def setup_site(self):
+        state = self.state()
+        require(state['phase'] == 'ready' and 'node' in state['components'], 'working_node_required')
+        config = state['config']
+        if not config.get('email'):
+            config['email'] = input('Email для сертификата ноды Let’s Encrypt: ').strip()
+        package = self.root / 'releases' / state['components']['node']['version'] / 'node'
+        node.owned(package)
+        system.dependencies()
+        info = site.setup(self.root, config)
+        config['node_site'] = True; config['node_domain'] = info['domain']; self.commit(state)
+        print('HTTPS-сайт и автопродление готовы: https://' + info['domain'] + ':8445')
 
     def status(self):
         state = self.state()
@@ -268,12 +302,13 @@ class Manager:
             return
         if 'panel' in state['components']: panel.health(self.root / 'panel')
         if 'node' in state['components']: node.health()
+        if state['config'].get('node_site'): site.health(site.owned()['domain'])
         print('Проверка работающих служб и защищённой связи: OK')
 
 
 def main():
     parser = argparse.ArgumentParser(description='САЛФЕТКА: установка, обновления и управление')
-    parser.add_argument('operation', nargs='?', choices=['install', 'check', 'update', 'status', 'backup', 'restore', 'start', 'stop', 'renew'])
+    parser.add_argument('operation', nargs='?', choices=['install', 'check', 'update', 'status', 'backup', 'restore', 'start', 'stop', 'renew', 'site'])
     parser.add_argument('--role', choices=['panel', 'node', 'both'])
     parser.add_argument('--version'); parser.add_argument('--component', choices=['all', 'installer', 'panel', 'node'], default='all')
     parser.add_argument('--github-token-file', help='Только для временного PRIVATE-репозитория; файл 0600')
@@ -292,8 +327,8 @@ def main():
                     print('Есть незавершённая установка. Продолжение сохранит созданные ключи и данные.')
                     args.operation, args.role = 'install', current['config']['role']
                 else:
-                    print('1 — состояние; 2 — проверить обновления; 3 — обновить; 4 — резервная копия; 5 — восстановить; 6 — запустить; 7 — остановить')
-                    args.operation = {'1': 'status', '2': 'check', '3': 'update', '4': 'backup', '5': 'restore', '6': 'start', '7': 'stop'}.get(input('Выбор: ').strip())
+                    print('1 — состояние; 2 — проверить обновления; 3 — обновить; 4 — резервная копия; 5 — восстановить; 6 — запустить; 7 — остановить; 8 — настроить сайт ноды')
+                    args.operation = {'1': 'status', '2': 'check', '3': 'update', '4': 'backup', '5': 'restore', '6': 'start', '7': 'stop', '8': 'site'}.get(input('Выбор: ').strip())
             else:
                 print('1 — панель и нода; 2 — только нода; 3 — только панель')
                 args.role = {'1': 'both', '2': 'node', '3': 'panel'}.get(input('Выбор: ').strip()); args.operation = 'install'
@@ -308,6 +343,7 @@ def main():
             require(confirm('Установить обновление? Работа компонентов кратковременно прервётся.'), 'update_cancelled')
             manager.update(args.version, args.component)
         elif args.operation == 'renew': manager.renew()
+        elif args.operation == 'site': manager.setup_site()
         elif args.operation == 'status': manager.status()
         elif args.operation == 'backup': print('Резервная копия: ' + str(backup.create(ROOT, manager.state())))
         elif args.operation == 'restore':

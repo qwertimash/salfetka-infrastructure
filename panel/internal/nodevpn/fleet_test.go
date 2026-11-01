@@ -221,3 +221,66 @@ func TestFleetPlanExpiryStopsListenersWithoutPolling(t *testing.T) {
 		t.Fatal("expired manifest kept listener")
 	}
 }
+
+func TestFleetLocalCertificateRotationOnlyRestartsAffectedConnection(t *testing.T) {
+	key, _ := nodecontrol.GenerateSigner()
+	signer, _ := nodecontrol.LoadSigner(key)
+	pub, _ := nodecontrol.LoadPublicKey(signer.PublicPEM())
+	id := "00000000-0000-4000-8000-000000000001"
+	a := fleetDeployment(t, "00000000-0000-4000-8000-000000000002", 2443)
+	b := fleetDeployment(t, "00000000-0000-4000-8000-000000000003", 2444)
+	serial := "first"
+	invalid := false
+	created := map[string][]*fleetFake{}
+	f, err := OpenFleet(FleetConfig{StateDir: filepath.Join(t.TempDir(), "fleet"), NodeID: id, Signer: pub, Initialize: true, MaterialVersion: func(c nodewire.ConnectionDeployment) (string, error) {
+		if c.ID != a.ID {
+			return "", nil
+		}
+		if invalid {
+			return "", errors.New("expired")
+		}
+		return serial, nil
+	}, Open: func(c nodewire.ConnectionDeployment, _ string, _ bool) (FleetController, error) {
+		v := &fleetFake{epoch: c.ID}
+		created[c.ID] = append(created[c.ID], v)
+		return v, nil
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	plan := nodewire.ConnectionsPlan{SchemaVersion: 1, NodeID: id, Revision: 1, IssuedAt: time.Now().UTC(), ExpiresAt: time.Now().UTC().Add(time.Minute), Connections: []nodewire.ConnectionDeployment{a, b}}
+	signed, err := signer.SignConnections(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	apply := func() {
+		t.Helper()
+		if _, err = f.Apply(signed); err != nil {
+			t.Fatal(err)
+		}
+	}
+	apply()
+	apply()
+	if len(created[a.ID]) != 1 || len(created[b.ID]) != 1 {
+		t.Fatal("unchanged cert restarted runtime")
+	}
+	serial = "renewed"
+	apply()
+	if len(created[a.ID]) != 2 || !created[a.ID][0].stopped.Load() || len(created[b.ID]) != 1 || created[b.ID][0].stopped.Load() {
+		t.Fatal("renewal affected unrelated runtime")
+	}
+	invalid = true
+	apply()
+	if !created[a.ID][1].stopped.Load() || len(f.Bindings()) != 1 {
+		t.Fatal("expired local cert remains active")
+	}
+	invalid = false
+	apply()
+	if len(created[a.ID]) != 3 || len(created[b.ID]) != 1 {
+		t.Fatal("failed certificate recovery")
+	}
+	if f.state.Revision != 1 || f.state.Seen[a.ID].Hash != a.ConfigurationSHA256 {
+		t.Fatal("renewal rewrote signed watermark")
+	}
+}

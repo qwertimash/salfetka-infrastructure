@@ -16,6 +16,7 @@ it('creates a template batch with distinct SNI, ports and one node identity; ret
  render(<ManagedServerView api={api} intents={new NodeIntents()} canWrite id={id} name="Test machine" address="203.0.113.10" domain="pol.example.com"/>);
  fireEvent.click(await screen.findByRole('button',{name:'Добавить подключения'}))
  fireEvent.click(await screen.findByLabelText('TCP Reality · TCP'));fireEvent.click(screen.getByLabelText('gRPC · TCP'))
+ fireEvent.click(screen.getByLabelText('Ручная настройка домена и сертификатов'))
  expect((screen.getByLabelText('Публичный адрес сервера') as HTMLInputElement).value).toBe('203.0.113.10')
  expect((screen.getByLabelText('Домен TLS-сертификата') as HTMLInputElement).value).toBe('pol.example.com')
  expect((screen.getByLabelText('Reality SNI') as HTMLInputElement).value).toBe('pol.example.com')
@@ -72,4 +73,29 @@ it('read-only role cannot revoke an active node or retry a retained mutation',as
  const calls=vi.spyOn(api,'request').mockResolvedValue({node:{...n,state:'active'},legacy:false,connections:[]})
  render(<ManagedServerView api={api} intents={intents} canWrite={false} id={id} name="Test machine"/>);await screen.findByText('Нода сервера')
  expect(screen.queryByRole('button',{name:/Отозвать|Повторить/})).toBeNull();expect(calls.mock.calls.some(([,o])=>o?.method==='POST')).toBe(false)
+})
+it('uses node-local TLS and its own Reality site without requesting private PEM',async()=>{
+ const api=new ApiClient()
+ const current={...n,state:'active',contact_state:'fresh',inventory:{schema_version:1,node_id:id,boot_id:id,sequence:1,version:'0.7.0',platform:'linux',arch:'amd64',capabilities:['managed_connections_v1'],site:{domain:'pol.example.com',state:'ready',expires_at:'2030-01-01T00:00:00Z'}}}
+ const calls=vi.spyOn(api,'request').mockImplementation(async(path,opt)=>{
+  if(opt?.method==='POST')return {} as never
+  if(path==='/managed/templates')return {items:templates} as never
+  return {node:current,legacy:false,connections:[]} as never
+ })
+ render(<ManagedServerView api={api} intents={new NodeIntents()} canWrite id={id} name="Fixture" address="203.0.113.10" domain="pol.example.com"/>);
+ fireEvent.click(await screen.findByRole('button',{name:'Добавить подключения'}))
+ fireEvent.click(await screen.findByLabelText('TCP Reality · TCP'));fireEvent.click(screen.getByLabelText('gRPC · TCP'))
+ expect(screen.queryByLabelText('Приватный ключ PEM')).toBeNull()
+ fireEvent.click(screen.getByRole('button',{name:'Создать и применить'}))
+ await waitFor(()=>expect(calls.mock.calls.some(([,o])=>o?.method==='POST')).toBe(true))
+ const body=calls.mock.calls.find(([,o])=>o?.method==='POST')![1]!.body as {connections:{configuration:{public:Record<string,unknown>;private:Record<string,string>}}[]}
+ expect(body.connections.every(c=>c.configuration.public.certificate_source==='node'&&c.configuration.public.server_name==='pol.example.com'&&Object.keys(c.configuration.private).length===0)).toBe(true)
+ expect(body.connections[0].configuration.public.reality_target).toBe('127.0.0.1:8445')
+})
+it('blocks automatic creation until fresh node TLS is ready',async()=>{
+ const api=new ApiClient();vi.spyOn(api,'request').mockImplementation(async(path)=>path==='/managed/templates'?{items:templates} as never:{node:n,legacy:false,connections:[]} as never)
+ render(<ManagedServerView api={api} intents={new NodeIntents()} canWrite id={id} name="Fixture" address="203.0.113.10" domain="pol.example.com"/>);
+ fireEvent.click(await screen.findByRole('button',{name:'Добавить подключения'}));fireEvent.click(await screen.findByLabelText('gRPC · TCP'))
+ expect((screen.getByRole('button',{name:'Создать и применить'}) as HTMLButtonElement).disabled).toBe(true)
+ expect(screen.getByText(/Сначала завершите установку сайта/)).toBeTruthy()
 })

@@ -83,7 +83,10 @@ def restore(root, directory, expected_state):
     root, directory = Path(root), Path(directory).absolute()
     source_state = verify(directory)
     require('panel' in source_state['components'] and 'panel' in expected_state['components'], 'installed_panel_required_for_restore')
-    require(source_state['config'] == expected_state['config'], 'backup_belongs_to_different_installation')
+    # Enabling the node website does not change panel identity. Backups made
+    # before that additive feature remain valid; restore leaves node files intact.
+    identity_config = lambda value: {k: v for k, v in value.items() if k != 'node_site'}
+    require(identity_config(source_state['config']) == identity_config(expected_state['config']), 'backup_belongs_to_different_installation')
     home = root / 'panel'; owner = panel.owned(home)
     # Preserve live identity/configuration. A DB snapshot from a different master
     # key/authority cannot be safely combined with this installation.
