@@ -16,8 +16,7 @@ Bootstrap `install.py` из официального репозитория пр
 
 ```sh
 download_dir=$(mktemp -d)
-curl -fL --proto '=https' --tlsv1.2 https://github.com/qwertimash/salfetka-infrastructure/releases/latest/download/install.py -o "$download_dir/install.py"
-sudo python3 "$download_dir/install.py"
+curl -fL --proto '=https' --tlsv1.2 https://github.com/qwertimash/salfetka-infrastructure/releases/latest/download/install.py -o "$download_dir/install.py" && sudo python3 "$download_dir/install.py"
 ```
 
 Пока репозиторий PRIVATE, получите `install.py` из Release через авторизованный
@@ -66,8 +65,8 @@ sudo salfetka
 sudo salfetka status
 sudo salfetka check
 sudo salfetka update
-sudo salfetka update --component panel --version 0.6.1
-sudo salfetka update --component node --version 0.6.1
+sudo salfetka update --component panel --version 0.6.2
+sudo salfetka update --component node --version 0.6.2
 sudo salfetka backup
 ```
 
@@ -77,6 +76,21 @@ sudo salfetka backup
 протокол и schema. Downgrade отклоняется. Затем создаётся приватная резервная копия,
 обновляются выбранные компоненты и проверяются readiness/heartbeat. Ключи,
 пользователи, ссылки подписок, настройки и регистрация нод сохраняются.
+
+Проверка образа поддерживает classic Docker и containerd: их локальные image ID
+могут различаться. После импорта установщик сверяет неизменяемую конфигурацию
+образа (включая хеши слоёв) с подписанным архивом; одного совпадения тега недостаточно.
+
+Для служебных PRIVATE-версий `0.6.0`/`0.6.1` сначала обновите сам установщик,
+затем повторите команду уже новым процессом:
+
+```sh
+sudo salfetka update --component installer --version 0.6.2 --github-token-file /root/github-read-token
+sudo salfetka update --version 0.6.2 --github-token-file /root/github-read-token
+```
+
+Это переход с ранних приёмочных сборок, которые ещё не учитывали различия image ID.
+В новой установке с `0.6.2` используется обычный `salfetka update`.
 
 `/opt/salfetka-manager/state.json` хранит установленные версии, `transaction.json`
 — этап незавершённой операции. Ошибка не отмечается как успех. Повторный `update`

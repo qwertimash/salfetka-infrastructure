@@ -31,6 +31,8 @@ from pathlib import Path
 value={'version':sys.argv[1],'platform':'linux/'+sys.argv[2],'image_id':subprocess.check_output(['docker','image','inspect','--format={{.Id}}','salfetka-panel:'+sys.argv[1]],text=True).strip()}
 Path('dist/panel/image.json').write_text(json.dumps(value)+'\n')
 PY
+# Acceptance must import the archive, not reuse the builder's existing image.
+docker image rm "salfetka-panel:$version"
 
 # Native systemd/Docker acceptance on the disposable runner, with fixture TLS.
 sudo mkdir -p /tmp/salfetka-qa-code

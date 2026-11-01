@@ -3,6 +3,8 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import tarfile
+import tempfile
 import time
 import uuid
 
@@ -36,17 +38,57 @@ def record(home, doc, owner):
     save(Path(home) / 'owner.json', owner)
 
 
+def image_configuration(archive, tagged=False):
+    """Docker/OCI stores expose different image IDs; config bytes are portable.
+
+    The immutable config also binds every uncompressed filesystem layer through
+    rootfs.diff_ids. Never accept a local tag alone as proof of the loaded image.
+    """
+    try:
+        with tarfile.open(archive) as source:
+            members = source.getmembers()
+            require(len(members) <= 4096 and len({m.name for m in members}) == len(members), 'image_archive_invalid')
+            def read(name):
+                member = source.getmember(name)
+                require(member.isfile() and 0 < member.size <= 1024 * 1024, 'image_archive_invalid')
+                return source.extractfile(member).read()
+            manifest = decode(read('manifest.json'))
+            require(isinstance(manifest, list) and len(manifest) == 1, 'single_image_required')
+            entry = manifest[0]
+            require(isinstance(entry, dict) and isinstance(entry.get('Config'), str)
+                    and re.fullmatch(r'(?:[a-f0-9]{64}\.json|blobs/sha256/[a-f0-9]{64})', entry['Config']), 'image_archive_invalid')
+            config = read(entry['Config'])
+            reference = None
+            if tagged:
+                tags = entry.get('RepoTags')
+                require(isinstance(tags, list) and len(tags) == 1 and isinstance(tags[0], str)
+                        and re.fullmatch(r'[a-z0-9][a-z0-9._/-]*:[A-Za-z0-9_][A-Za-z0-9_.-]*', tags[0]), 'image_reference_invalid')
+                reference = tags[0]
+            return hashlib.sha256(config).hexdigest(), reference
+    except (tarfile.TarError, KeyError, OSError, ValueError):
+        raise Failure('image_archive_invalid') from None
+
+
 def load_image(package):
     package = Path(package)
     data = decode(regular(package / 'image.json'))
     require(set(data) == {'image_id', 'version', 'platform'}
             and re.fullmatch(r'sha256:[0-9a-f]{64}', data['image_id']), 'image_metadata_invalid')
+    expected, reference = image_configuration(package / 'image.tar', tagged=True)
     run(['docker', 'load', '-i', package / 'image.tar'], timeout=600)
-    value = run(['docker', 'image', 'inspect', '--format={{.Id}}', data['image_id']]).decode().strip()
-    require(value == data['image_id'], 'image_id_mismatch')
+    value = run(['docker', 'image', 'inspect', '--format={{.Id}}', reference]).decode().strip()
+    require(re.fullmatch(r'sha256:[0-9a-f]{64}', value), 'image_id_invalid')
+    # Pin the immutable local ID before inspecting/exporting, so a concurrent tag
+    # replacement cannot switch the candidate. Export verifies the config bytes
+    # against the signed archive on both classic Docker and containerd stores.
+    with tempfile.TemporaryDirectory(prefix='salfetka-image-verify-') as temporary:
+        exported = Path(temporary) / 'image.tar'
+        run(['docker', 'image', 'save', '-o', exported, value], timeout=600)
+        actual, _ = image_configuration(exported)
+    require(actual == expected, 'image_configuration_mismatch')
     arch = run(['docker', 'image', 'inspect', '--format={{.Os}}/{{.Architecture}}', value]).decode().strip()
     require(arch == data['platform'], 'image_architecture_mismatch')
-    return data
+    return dict(data, image_id=value)
 
 
 def edge_config(config):
