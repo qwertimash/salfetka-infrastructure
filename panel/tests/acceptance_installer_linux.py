@@ -10,7 +10,7 @@ import sys
 import time
 
 sys.path.insert(0, '/tmp/salfetka-qa-code')
-from installer import panel, node, system
+from installer import backup, panel, node, system
 from installer.common import atomic, decode, regular, run, save
 
 assert os.geteuid() == 0
@@ -46,7 +46,7 @@ try:
     import uuid
     node_id=str(uuid.UUID(state['node_id']))
     for _ in range(30):
-        accepted=panel.compose(home,'exec','-T','postgres','psql','-U','panel_migrator','-d',panel.database_name(home),'-Atc',
+        accepted=panel.compose(home,'exec','-T','postgres','psql','-U','panel_migrator','-d',backup.database_name(home),'-Atc',
             "SELECT count(*) FROM managed_connection_observations WHERE node_id='"+node_id+"' AND body->'states'='[]'::jsonb AND received_at > clock_timestamp()-interval '15 seconds'").strip()
         if accepted == b'1': break
         time.sleep(2)
