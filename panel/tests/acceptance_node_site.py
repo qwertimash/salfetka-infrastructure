@@ -103,6 +103,14 @@ try:
   site.setup(root,config)
   assert peer(8445)==before
   report['real_http01_issue_and_repeat']=True; print('PASS: real_http01_issue_and_repeat',flush=True)
+  site_pid=int(run(['systemctl','show',site.SERVICE,'--property=MainPID','--value']))
+  site_uid=(Path('/proc')/str(site_pid)).stat().st_uid
+  agent_uid=(node.HOME/'state/identity/state.json').stat().st_uid
+  assert site_uid not in (0,agent_uid)
+  result=subprocess.run(['setpriv','--reuid',str(site_uid),'--regid',str((site.home()/'bundle.pem').stat().st_gid),'--clear-groups',
+                         'test','-r',str(node.HOME/'state/identity/state.json')],capture_output=True)
+  assert result.returncode==1
+  report['website_cannot_read_node_identity']=True;print('PASS: website_cannot_read_node_identity',flush=True)
 
  # Authenticate using only the synthetic owner created by native acceptance.
  api=panel.setup_owner(home,'qa_owner',regular(root/'password').decode())

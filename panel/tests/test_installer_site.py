@@ -78,5 +78,6 @@ class SiteTests(unittest.TestCase):
 
  def test_site_unit_has_no_write_access_to_certificates(self):
   text=site.definition().decode()
-  self.assertIn('User=salfetka-main',text);self.assertIn('ProtectSystem=strict',text)
+  self.assertIn('DynamicUser=yes',text);self.assertIn('User=salfetka-node-site',text);self.assertIn('ProtectSystem=strict',text)
+  self.assertIn('InaccessiblePaths=',text)
   self.assertNotIn('ReadWritePaths=',text);self.assertNotIn('CAP_NET_ADMIN',text)

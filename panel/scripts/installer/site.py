@@ -33,7 +33,8 @@ Wants=network-online.target
 After=network-online.target
 [Service]
 Type=exec
-User=salfetka-main
+DynamicUser=yes
+User=salfetka-node-site
 Group=salfetka-main
 ExecStart={node.HOME}/bin/panel-server-node site {home()}
 UMask=0077
@@ -50,6 +51,8 @@ ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes
 ProtectClock=yes
+ProtectProc=invisible
+InaccessiblePaths=-{node.HOME}/state -{node.HOME}/config
 RestrictSUIDSGID=yes
 RestrictNamespaces=yes
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
@@ -193,6 +196,10 @@ def setup(root, config, pair=None):
     if config.get('node_domain'): require(config['node_domain'] == info['domain'], 'node_site_domain_changed')
     dns(info['domain'], info['address'])
     directory = home(); account = pwd.getpwnam('salfetka-main')
+    # Never run the public website as a pre-existing account, especially the
+    # node identity's UID. systemd creates and removes its separate dynamic UID.
+    require(not any(line.split(':', 1)[0] == 'salfetka-node-site'
+                    for line in Path('/etc/passwd').read_text().splitlines()), 'foreign_site_user_preserved')
     require(not directory.is_symlink(), 'unsafe_site_directory')
     if directory.exists():
         require(regular(directory / 'config.json') == (json.dumps({'domain': info['domain']}, ensure_ascii=False, indent=2)+'\n').encode(), 'node_site_domain_changed')
