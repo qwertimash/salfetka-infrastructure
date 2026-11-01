@@ -1,54 +1,31 @@
 # САЛФЕТКА — панель и ноды
 
-Единый установщик для Ubuntu 24.04 LTS, amd64/arm64 и systemd. Репозиторий
-`qwertimash/salfetka-infrastructure` приватный на время разработки. После открытия
-репозитория установка и обновления не требуют GitHub-токенов.
+Единый установщик для Ubuntu24.04 LTS, amd64/arm64 и systemd.
+Репозиторий `qwertimash/salfetka-infrastructure` публичный. GitHub-токен не нужен.
 
 ## Установка
 
-Bootstrap `install.py` из официального репозитория проверяет Ed25519-подпись
-каталога релиза и SHA-256 готового пакета прежде, чем запустить мастер.
-Первоначальный источник доверия — официальный GitHub-репозиторий по HTTPS.
-Для запуска нужны Ubuntu24.04, sudo/root, Python3, curl, OpenSSL и системные CA.
+В терминале тестового VPS от root выполните одну команду:
 
-Пока репозиторий PRIVATE, вставьте весь блок в терминал VPS: это одна команда.
-Она скрыто запросит GitHub-токен, автоматически скачает bootstrap и откроет мастер.
-Токену нужен доступ только к `qwertimash/salfetka-infrastructure`, Contents: Read-only.
-Токен не вставляется в саму команду, URL или аргументы процессов. Временный файл0600
-в каталоге0700 удаляется при обычном завершении, ошибке и обрабатываемом прерывании.
-
-```sh
-sudo bash -c 'set +x; set -euo pipefail; umask 077
-d=$(mktemp -d /tmp/salfetka-start.XXXXXXXX)
-cleanup() { rm -rf -- "$d"; }; trap cleanup EXIT; trap "exit 130" INT; trap "exit 143" TERM
-read -rsp "GitHub token (Contents: read): " salfetka_token </dev/tty; printf "\n"
-[[ "$salfetka_token" =~ ^[A-Za-z0-9_]+$ && ${#salfetka_token} -le 4096 ]] || exit 1
-printf "%s" "$salfetka_token" > "$d/token"
-printf "Authorization: Bearer %s\n" "$salfetka_token" | curl -q -fsS --proto =https --tlsv1.2 --location --max-redirs 0 --connect-timeout 15 --max-time 60 --max-filesize 262144 -H @- -H "Accept: application/vnd.github.raw+json" "https://api.github.com/repos/qwertimash/salfetka-infrastructure/contents/install.py?ref=main" -o "$d/install.py"
-unset salfetka_token
-python3 "$d/install.py" --github-token-file "$d/token"'
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/qwertimash/salfetka-infrastructure/main/install.sh)
 ```
 
-Запрос к GitHub Contents API не следует перенаправлениям, проверяет HTTPS и
-получает только bootstrap из официального репозитория. Затем bootstrap скачивает
-опубликованный Release и проверяет Ed25519/SHA-256 готового установщика. Исходники
-текущего main на сервере не компилируются. Первоначальное доверие — GitHub HTTPS
-и официальный репозиторий, как у прежней ручной загрузки `install.py`.
+Если подключились обычным пользователем, сначала войдите в root через `sudo -i`.
+Скрипт проверит Ubuntu24.04, установит недостающие curl/Python3/OpenSSL/CA,
+скачает bootstrap опубликованного релиза и откроет мастер с тремя вариантами.
+Bootstrap проверяет Ed25519-подпись каталога и SHA-256 готового пакета прежде,
+чем запустить мастер. На целевом сервере исходники не компилируются.
+Первоначальное доверие — официальный GitHub-репозиторий по HTTPS.
 
-Повторный запуск той же команды на установленном сервере открывает меню управления
-с доступом к приватным релизам. GitHub-токен — отдельный доступ к загрузке, он не
-входит в SN1-приглашение ноды. При SIGKILL/отключении питания trap не выполняется:
-в `/tmp/salfetka-start.*` может остаться root-only временный файл до очистки /tmp.
+Код подключения ноды берётся в панели, в карточке нужного сервера. Он вводится
+внутри мастера после выбора «Только нода»; мастер показывает адрес панели для
+проверки. Это не GitHub-токен. Для «Панель и нода» приглашение создаётся автоматически.
 
-После открытия репозитория доступен запуск без токена:
-
-```sh
-download_dir=$(mktemp -d)
-curl -fL --proto '=https' --tlsv1.2 https://github.com/qwertimash/salfetka-infrastructure/releases/latest/download/install.py -o "$download_dir/install.py" && sudo python3 "$download_dir/install.py"
-```
-
-Прежний `--github-token-file /root/github-read-token` (файл0600) сохраняется для
-операторов, использующих собственное хранение токена и прямой `salfetka check/update`.
+Повторный запуск той же команды открывает меню управления. Также доступен
+`sudo salfetka`; установка и обновления публичных релизов не требуют авторизации GitHub.
+Прежний `--github-token-file` сохранён для совместимости частных копий установщика,
+для официального публичного репозитория он не нужен.
 
 Мастер предлагает три варианта:
 
@@ -151,8 +128,8 @@ sudo salfetka backup
 затем повторите команду уже новым процессом:
 
 ```sh
-sudo salfetka update --component installer --version 0.7.0 --github-token-file /root/github-read-token
-sudo salfetka update --version 0.7.0 --github-token-file /root/github-read-token
+sudo salfetka update --component installer --version 0.7.0
+sudo salfetka update --version 0.7.0
 ```
 
 Так новые проверки установщика выполняются уже в новом процессе. Самые ранние

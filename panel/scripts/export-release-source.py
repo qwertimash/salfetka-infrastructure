@@ -26,7 +26,7 @@ def files():
         'panel/docs/operator/pilot.md', 'panel/docs/operator/b4-vpn-node.md', 'panel/docs/operator/node-installer.md',
         'panel/docs/operator/installer-lifecycle.md',
         'panel/scripts/install.py', 'panel/scripts/install-node.py', 'panel/scripts/node-wizard.py', 'panel/scripts/salfetka.py',
-        'panel/scripts/build-release.py', 'panel/scripts/export-release-source.py', 'panel/scripts/private-install-command.sh', 'panel/scripts/prepare-pilot.py',
+        'panel/scripts/build-release.py', 'panel/scripts/export-release-source.py', 'panel/scripts/private-install-command.sh', 'panel/scripts/public-install.sh', 'panel/scripts/prepare-pilot.py',
         'panel/scripts/package-pilot.sh', 'panel/scripts/package-vpn-node.sh', 'panel/scripts/prepare-xray-server.py',
         'panel/scripts/collect-node-licenses.py', 'panel/scripts/ci-release.sh',
         'mobile/scripts/fetch-core-sources.py', 'mobile/scripts/subscription_catalog.py',
@@ -71,6 +71,7 @@ def main():
     shutil.copy2(ROOT / 'panel/deploy/release/workflow.yml', workflow)
     shutil.copy2(ROOT / 'panel/docs/operator/installer-lifecycle.md', target / 'README.md')
     write_bootstrap(target)
+    shutil.copy2(ROOT / 'panel/scripts/public-install.sh', target / 'install.sh')
     print('allowlisted_source_exported')
 
 if __name__ == '__main__': main()
